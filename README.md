@@ -46,10 +46,14 @@ Install the generated `.tgz` package directly:
 openclaw plugins install ./cmtoken.tgz
 ```
 
-Then, run the onboarding wizard to configure CMToken:
+Then, run the onboarding wizard or configuration command to set up CMToken:
 
 ```bash
+# Recommended for first-time setup
 openclaw onboard
+
+# Or to modify existing configuration
+openclaw configure
 ```
 
 ## Build Scripts
