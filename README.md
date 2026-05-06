@@ -1,6 +1,6 @@
-# CMToken Standalone Plugin
+# CMToken Plugin
 
-This is a standalone model provider plugin for OpenClaw that supports CMToken authentication (OAuth via phone number) and model inference.
+This is a model provider plugin for OpenClaw that supports CMToken authentication (OAuth via phone number) and model inference.
 
 ## Features
 

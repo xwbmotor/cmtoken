@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CMToken Plugin — Standalone Build & Package Script
+ * CMToken Plugin — Build & Package Script
  *
  * Usage:
  *   node scripts/build.mjs          # Build only (dist/index.js)
@@ -29,7 +29,7 @@ const OUTPUT_TGZ = resolve(ROOT, "cmtoken.tgz");
 const doPack = process.argv.includes("--pack");
 
 // ── Step 1: Build ──────────────────────────────────────────────────────
-console.log("\n🔨 Building standalone bundle...\n");
+console.log("\n🔨 Building bundle...\n");
 
 // Use local esbuild if it exists, otherwise fallback to npx
 const localEsbuild = resolve(ROOT, "node_modules/.bin/esbuild");
