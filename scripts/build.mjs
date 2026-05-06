@@ -125,6 +125,23 @@ try {
 rmSync(PACK_DIR, { recursive: true, force: true });
 
 console.log(`\n✅ Package → ${OUTPUT_TGZ}`);
-console.log(`   Size: ${(statSync(OUTPUT_TGZ).size / 1024 / 1024).toFixed(1)} MB\n`);
-console.log("Install with:");
+const stats = statSync(OUTPUT_TGZ);
+console.log(`   Size: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+
+// --- Archive Logic ---
+const version = pkg.version || "0.0.0";
+const RELEASES_DIR = resolve(ROOT, "releases");
+
+if (!existsSync(RELEASES_DIR)) {
+  mkdirSync(RELEASES_DIR, { recursive: true });
+}
+
+const archivedName = `cmtoken-v${version}-${envArg}.tgz`;
+const archivedPath = resolve(RELEASES_DIR, archivedName);
+
+copyFileSync(OUTPUT_TGZ, archivedPath);
+console.log(`📂 Archived → ${archivedPath}`);
+// ---------------------
+
+console.log("\nInstall with:");
 console.log(`  openclaw plugins install "${OUTPUT_TGZ}"\n`);
