@@ -29,14 +29,6 @@ This is a standalone model provider plugin for OpenClaw that supports CMToken au
     ```
     This generates a `cmtoken.tgz` file.
 
-## Configuration (Environment Variables)
-
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `CMTOKEN_BASE_URL` | Inference API base URL | `http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1` |
-| `CMTOKEN_DISCOVERY_URL` | Model discovery API endpoint | `http://agent.nat300.top/api/v1/models` |
-| `CMTOKEN_OAUTH_URL` | OAuth server base URL | `http://agent.nat300.top` |
-
 
 ## Usage in OpenClaw
 
