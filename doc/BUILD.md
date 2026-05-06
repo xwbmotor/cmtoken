@@ -8,52 +8,33 @@ npm run build
 
 # Build + package into cmtoken.tgz
 npm run pack
-
-# Start local mock server (for testing)
-npm run mock
 ```
 
-> All commands should be run from `extensions/cmtoken/`.
+> All commands should be run from the root of the `cmtoken` extension.
 
 ---
 
-## Full Testing Workflow
+## Testing Workflow
 
-### 1. Start the mock server
-
-```powershell
-npm run mock
-# → Mock CMToken server running at http://localhost:3000
-```
-
-### 2. Build & package
-
-Open a **second terminal**:
+### 1. Build & package
 
 ```powershell
 npm run pack
-# → ✅ Package → .../cmtoken.tgz (~0.9 MB)
+# → ✅ Package → .../cmtoken.tgz
 ```
 
-### 3. Install & run
+### 2. Install & run
 
 ```powershell
 # Remove any previous installation
-rm -r -Force $HOME\.openclaw\extensions\cmtoken
+openclaw plugins uninstall cmtoken
 
 # Install the fresh package
 openclaw plugins install .\cmtoken.tgz
 
-# Set the mock server URL and start OpenClaw
-$env:CMTOKEN_BASE_URL="http://localhost:3000"
+# Start OpenClaw for testing
 openclaw dev
 ```
-
-### 4. Verify
-
-- Complete the OAuth flow in your browser (click "Authorize")
-- In the model picker, search for `mock-` — you should see mock models
-- Check console for `[cmtoken] Successfully fetched N models from mock server`
 
 ---
 
