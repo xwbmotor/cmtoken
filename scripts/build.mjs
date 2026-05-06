@@ -8,7 +8,7 @@
  *
  * The resulting .tgz is a fully self-contained plugin archive that can be
  * installed on any OpenClaw host via:
- *   openclaw plugins install ./cmtoken.tgz
+ *   openclaw plugins install ./releases/cmtoken-v1.0.0-test.tgz
  *
  */
 
@@ -22,7 +22,6 @@ const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, "..");           // extensions/cmtoken
 const DIST = resolve(ROOT, "dist");
 const PACK_DIR = resolve(ROOT, ".pack-staging");
-const OUTPUT_TGZ = resolve(ROOT, "cmtoken.tgz");
 
 const doPack = process.argv.includes("--pack");
 const envArg = process.argv.find(arg => arg.startsWith("--env="))?.split("=")[1] || "test";
@@ -86,7 +85,16 @@ if (!doPack) {
 }
 
 // ── Step 2: Pack ───────────────────────────────────────────────────────
-console.log("📦 Packaging cmtoken.tgz ...\n");
+console.log("📦 Packaging...\n");
+
+// Read version from package.json
+const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
+const version = pkg.version || "0.0.0";
+const RELEASES_DIR = resolve(ROOT, "releases");
+if (!existsSync(RELEASES_DIR)) mkdirSync(RELEASES_DIR, { recursive: true });
+
+const archivedName = `cmtoken-v${version}-${envArg}.tgz`;
+const finalTgzPath = resolve(RELEASES_DIR, archivedName);
 
 // Clean & create staging dir
 if (existsSync(PACK_DIR)) rmSync(PACK_DIR, { recursive: true, force: true });
@@ -98,21 +106,22 @@ mkdirSync(PKG_DIR, { recursive: true });
 // Copy artifacts into staging/package
 copyFileSync(resolve(DIST, "index.js"), resolve(PKG_DIR, "index.js"));
 
-// Sanitize package.json for bundling (remove dependencies as they are already bundled)
-const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
-delete pkg.dependencies;
-delete pkg.devDependencies;
-delete pkg.scripts;
-writeFileSync(resolve(PKG_DIR, "package.json"), JSON.stringify(pkg, null, 2));
+// Sanitize package.json for bundling
+const bundlePkg = { ...pkg };
+delete bundlePkg.dependencies;
+delete bundlePkg.devDependencies;
+delete bundlePkg.scripts;
+writeFileSync(resolve(PKG_DIR, "package.json"), JSON.stringify(bundlePkg, null, 2));
 
 if (existsSync(resolve(ROOT, "openclaw.plugin.json"))) {
   copyFileSync(resolve(ROOT, "openclaw.plugin.json"), resolve(PKG_DIR, "openclaw.plugin.json"));
 }
 
-// Create tarball
+// Create tarball directly in releases/
 try {
-  // Use -C and 'package' to ensure the root of the tarball is the 'package' directory
-  execSync(`tar -czf "${OUTPUT_TGZ}" -C "${PACK_DIR}" package`, {
+  if (existsSync(finalTgzPath)) rmSync(finalTgzPath);
+  
+  execSync(`tar -czf "${finalTgzPath}" -C "${PACK_DIR}" package`, {
     stdio: "inherit",
     shell: true,
   });
@@ -124,24 +133,9 @@ try {
 // Cleanup staging
 rmSync(PACK_DIR, { recursive: true, force: true });
 
-console.log(`\n✅ Package → ${OUTPUT_TGZ}`);
-const stats = statSync(OUTPUT_TGZ);
+const stats = statSync(finalTgzPath);
+console.log(`\n✅ Package → ${finalTgzPath}`);
 console.log(`   Size: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
 
-// --- Archive Logic ---
-const version = pkg.version || "0.0.0";
-const RELEASES_DIR = resolve(ROOT, "releases");
-
-if (!existsSync(RELEASES_DIR)) {
-  mkdirSync(RELEASES_DIR, { recursive: true });
-}
-
-const archivedName = `cmtoken-v${version}-${envArg}.tgz`;
-const archivedPath = resolve(RELEASES_DIR, archivedName);
-
-copyFileSync(OUTPUT_TGZ, archivedPath);
-console.log(`📂 Archived → ${archivedPath}`);
-// ---------------------
-
 console.log("\nInstall with:");
-console.log(`  openclaw plugins install "${OUTPUT_TGZ}"\n`);
+console.log(`  openclaw plugins install "./releases/${archivedName}"\n`);
