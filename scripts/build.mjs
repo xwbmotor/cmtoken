@@ -46,6 +46,11 @@ const esbuildCmd = [
   "--external:@openclaw/*",
   "--minify",
   "--sourcemap",
+  // Inject built-in constants
+  '--define:process.env.CMTOKEN_BASE_URL="\\"http://agent.nat300.top/api/v1/uifm-gateway/plan/v1\\""',
+  '--define:process.env.CMTOKEN_DISCOVERY_URL="\\"http://agent.nat300.top/api/v1/models\\""',
+  '--define:process.env.CMTOKEN_OAUTH_URL="\\"https://testcert.cmpassport.com:7002/oauth2-service\\""',
+  '--define:process.env.CMTOKEN_CLIENT_ID="\\"client-123\\""',
 ].join(" ");
 
 try {
