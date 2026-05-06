@@ -1,0 +1,55 @@
+{
+  "id": "cmtoken",
+  "enabledByDefault": true,
+  "providers": ["cmtoken"],
+  "autoEnableWhenConfiguredProviders": ["cmtoken"],
+
+  "providerAuthChoices": [
+    {
+      "provider": "cmtoken",
+      "method": "oauth",
+      "choiceId": "cmtoken-oauth",
+      "choiceLabel": "CMToken OAuth",
+      "choiceHint": "Login via browser or QR code",
+      "groupId": "cmtoken",
+      "groupLabel": "CMToken",
+      "groupHint": "CMToken AI Models"
+    },
+    {
+      "provider": "cmtoken",
+      "method": "api-key",
+      "choiceId": "cmtoken-api-key",
+      "choiceLabel": "CMToken API Key",
+      "choiceHint": "Use API key for authentication",
+      "groupId": "cmtoken",
+      "groupLabel": "CMToken",
+      "groupHint": "CMToken AI Models",
+      "optionKey": "cmtokenApiKey",
+      "cliFlag": "--cmtoken-api-key",
+      "cliOption": "--cmtoken-api-key <key>",
+      "cliDescription": "CMToken API key"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "description": "API 推理基地址 (例如 http://maas.example.com/api/v1)"
+      },
+      "discoveryUrl": {
+        "type": "string",
+        "description": "模型列表获取地址 (例如 http://maas.example.com/api/v1/models)"
+      },
+      "oauthBaseUrl": {
+        "type": "string",
+        "description": "OAuth 认证服务器基地址 (例如 https://auth.example.com/oauth2)"
+      },
+      "clientId": {
+        "type": "string",
+        "description": "OAuth 客户端 ID"
+      }
+    }
+  }
+}

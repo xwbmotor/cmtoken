@@ -1,0 +1,33 @@
+{
+  "name": "cmtoken",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenClaw CMToken provider plugin with OAuth support",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "pack": "node scripts/build.mjs --pack"
+  },
+
+  "devDependencies": {
+    "json5": "latest",
+    "openclaw": "latest",
+    "esbuild": "0.27.4",
+    "vitest": "^4.1.2",
+    "typescript": "^6.0.2",
+    "tsx": "latest",
+    "@types/node": "^25.5.2",
+    "@types/qrcode-terminal": "^0.12.2"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "install": {
+      "minHostVersion": ">=2024.1.0"
+    }
+  }
+}
