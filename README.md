@@ -45,6 +45,16 @@ Install the generated `.tgz` package directly:
 openclaw plugins install ./cmtoken.tgz
 ```
 
+If you already have an older version installed, you can update it by running the same install command, or by uninstalling it first:
+
+```bash
+# To uninstall first (optional)
+openclaw plugins uninstall cmtoken
+
+# Then install the new version
+openclaw plugins install ./cmtoken.tgz
+```
+
 Then, run the onboarding wizard or configuration command to set up CMToken:
 
 ```bash
