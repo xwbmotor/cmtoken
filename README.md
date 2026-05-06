@@ -18,23 +18,48 @@ This is a model provider plugin for OpenClaw that supports CMToken authenticatio
     ```bash
     npm install
     ```
-3.  **Build**:
-    ```bash
-    # Build for test environment (default)
-    npm run build
 
-    # Build for production environment
-    node scripts/build.mjs --env=prod
-    ```
-4.  **Package**:
-    ```bash
-    # Package for test environment
-    npm run pack
+## Environment Configuration
 
-    # Package for production environment
-    node scripts/build.mjs --env=prod --pack
-    ```
-    This generates a `cmtoken.tgz` file with built-in configurations.
+All API and OAuth endpoints are managed in `environments.json`. You can modify this file to customize the built-in addresses for different environments.
+
+```json
+{
+  "test": {
+    "BASE_URL": "...",      // Inference API base
+    "DISCOVERY_URL": "...", // Model discovery endpoint
+    "OAUTH_URL": "...",     // OAuth server base
+    "CLIENT_ID": "..."      // OAuth client ID
+  },
+  "prod": { ... }
+}
+```
+
+---
+
+## Build & Package
+
+### 🧪 Test Environment (Default)
+Used for local development and testing.
+
+```bash
+# Build only
+npm run build
+
+# Build & Package (generates cmtoken.tgz)
+npm run pack
+```
+
+### 🚀 Production Environment
+Used for final distribution with official endpoints.
+
+```bash
+# Build only
+node scripts/build.mjs --env=prod
+
+# Build & Package (generates cmtoken.tgz)
+node scripts/build.mjs --env=prod --pack
+```
 
 
 ## Usage in OpenClaw
