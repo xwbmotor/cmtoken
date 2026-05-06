@@ -20,13 +20,21 @@ This is a model provider plugin for OpenClaw that supports CMToken authenticatio
     ```
 3.  **Build**:
     ```bash
+    # Build for test environment (default)
     npm run build
+
+    # Build for production environment
+    node scripts/build.mjs --env=prod
     ```
 4.  **Package**:
     ```bash
+    # Package for test environment
     npm run pack
+
+    # Package for production environment
+    node scripts/build.mjs --env=prod --pack
     ```
-    This generates a `cmtoken.tgz` file.
+    This generates a `cmtoken.tgz` file with built-in configurations.
 
 
 ## Usage in OpenClaw
