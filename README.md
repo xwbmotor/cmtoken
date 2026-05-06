@@ -21,7 +21,13 @@ This is a model provider plugin for OpenClaw that supports CMToken authenticatio
 
 ## Environment Configuration
 
-All API and OAuth endpoints are managed in `environments.json`. You can modify this file to customize the built-in addresses for different environments.
+All API and OAuth endpoints are managed in `environments.json`. Since this file contains potentially sensitive URLs, it is ignored by Git.
+
+To get started, copy the example file:
+```bash
+cp environments.json.example environments.json
+```
+Then, modify `environments.json` to customize the built-in addresses:
 
 ```json
 {

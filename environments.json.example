@@ -1,0 +1,14 @@
+{
+  "test": {
+    "BASE_URL": "http://your-test-api-base.com",
+    "DISCOVERY_URL": "http://your-test-discovery-url.com",
+    "OAUTH_URL": "http://your-test-oauth-url.com",
+    "CLIENT_ID": "your-test-client-id"
+  },
+  "prod": {
+    "BASE_URL": "http://your-prod-api-base.com",
+    "DISCOVERY_URL": "http://your-prod-discovery-url.com",
+    "OAUTH_URL": "http://your-prod-oauth-url.com",
+    "CLIENT_ID": "your-prod-client-id"
+  }
+}
