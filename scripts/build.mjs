@@ -10,8 +10,6 @@
  * installed on any OpenClaw host via:
  *   openclaw plugins install ./cmtoken.tgz
  *
- * Environment variables (runtime, not build-time):
- *   CMTOKEN_BASE_URL  — Override OAuth + API base URL (e.g. http://localhost:3000)
  */
 
 import { execSync } from "node:child_process";

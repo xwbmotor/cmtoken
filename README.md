@@ -5,7 +5,6 @@ This is a model provider plugin for OpenClaw that supports CMToken authenticatio
 ## Features
 
 - **Decoupled**: Independent of the OpenClaw monorepo source code.
-- **Configurable**: All API and OAuth endpoints can be customized via environment variables.
 
 ## Prerequisites
 
