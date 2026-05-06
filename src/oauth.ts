@@ -14,12 +14,11 @@ const CMTOKEN_OAUTH_DEFAULT_CONFIG = {
 } as const;
 
 const hostname = os.hostname();
-const isTestEnv = process.env.BUILD_ENV === "test";
-
 const CMTOKEN_OAUTH_SCOPE = JSON.stringify({
-  scopes: isTestEnv
-    ? ["ai:model:completion"]
-    : ["ai:model:completion", `identity:device:${hostname}`]
+  scopes: [
+    "ai:model:completion",
+    `identity:device:${hostname}`
+  ]
 });
 const CMTOKEN_OAUTH_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 
