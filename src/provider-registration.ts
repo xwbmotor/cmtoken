@@ -20,8 +20,8 @@ const PROVIDER_LABEL = "CMToken";
 
 
 
-const DEFAULT_DISCOVERY_URL = "http://agent.nat300.top/api/v1/uifm-gateway/v1/models";
-const DEFAULT_BASE_URL = "http://agent.nat300.top/api/v1/uifm-gateway/plan/v1";
+const DEFAULT_DISCOVERY_URL = process.env.CMTOKEN_DISCOVERY_URL as string;
+const DEFAULT_BASE_URL = process.env.CMTOKEN_BASE_URL as string;
 
 const INLINED_STATIC_MODELS = [
   {

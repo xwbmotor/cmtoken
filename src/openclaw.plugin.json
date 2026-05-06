@@ -1,16 +1,16 @@
 {
   "id": "cmtoken",
   "enabledByDefault": true,
-  "providers": ["cmtoken"],
-  "autoEnableWhenConfiguredProviders": ["cmtoken"],
+  "providers": [
+    "cmtoken"
+  ],
+  "autoEnableWhenConfiguredProviders": [
+    "cmtoken"
+  ],
   "providerAuthEnvVars": {
     "cmtoken": [
       "CMTOKEN_OAUTH_TOKEN",
-      "CMTOKEN_API_KEY",
-      "CMTOKEN_OAUTH_URL",
-      "CMTOKEN_CLIENT_ID",
-      "CMTOKEN_BASE_URL",
-      "CMTOKEN_DISCOVERY_URL"
+      "CMTOKEN_API_KEY"
     ]
   },
   "providerAuthChoices": [
@@ -42,23 +42,6 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "properties": {
-      "baseUrl": {
-        "type": "string",
-        "description": "API 推理基地址 (例如 http://maas.example.com/api/v1)"
-      },
-      "discoveryUrl": {
-        "type": "string",
-        "description": "模型列表获取地址 (例如 http://maas.example.com/api/v1/models)"
-      },
-      "oauthBaseUrl": {
-        "type": "string",
-        "description": "OAuth 认证服务器基地址 (例如 https://auth.example.com/oauth2)"
-      },
-      "clientId": {
-        "type": "string",
-        "description": "OAuth 客户端 ID"
-      }
-    }
+    "properties": {}
   }
 }
