@@ -1,0 +1,14 @@
+{
+  "test": {
+    "BASE_URL": "http://agent.nat300.top/api/v1/uifm-gateway/plan/v1",
+    "DISCOVERY_URL": "http://agent.nat300.top/api/v1/models",
+    "OAUTH_URL": "https://testcert.cmpassport.com:7002/oauth2-service",
+    "CLIENT_ID": "client-123"
+  },
+  "prod": {
+    "BASE_URL": "http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1",
+    "DISCOVERY_URL": "http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/models",
+    "OAUTH_URL": "https://testcert.cmpassport.com:7002/oauth2-service",
+    "CLIENT_ID": "client-123"
+  }
+}

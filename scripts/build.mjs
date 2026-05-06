@@ -25,9 +25,26 @@ const PACK_DIR = resolve(ROOT, ".pack-staging");
 const OUTPUT_TGZ = resolve(ROOT, "cmtoken.tgz");
 
 const doPack = process.argv.includes("--pack");
+const envArg = process.argv.find(arg => arg.startsWith("--env="))?.split("=")[1] || "test";
+
+// Load environment config
+const envsPath = resolve(ROOT, "environments.json");
+if (!existsSync(envsPath)) {
+  console.error("❌ environments.json not found");
+  process.exit(1);
+}
+const envs = JSON.parse(readFileSync(envsPath, "utf8"));
+const config = envs[envArg];
+
+if (!config) {
+  console.error(`❌ Unknown environment: ${envArg}`);
+  process.exit(1);
+}
+
+console.log(`\n🌟 Environment: ${envArg.toUpperCase()}`);
 
 // ── Step 1: Build ──────────────────────────────────────────────────────
-console.log("\n🔨 Building bundle...\n");
+console.log("🔨 Building bundle...\n");
 
 // Use local esbuild if it exists, otherwise fallback to npx
 const localEsbuild = resolve(ROOT, "node_modules/.bin/esbuild");
@@ -47,10 +64,11 @@ const esbuildCmd = [
   "--minify",
   "--sourcemap",
   // Inject built-in constants
-  '--define:process.env.CMTOKEN_BASE_URL="\\"http://agent.nat300.top/api/v1/uifm-gateway/plan/v1\\""',
-  '--define:process.env.CMTOKEN_DISCOVERY_URL="\\"http://agent.nat300.top/api/v1/models\\""',
-  '--define:process.env.CMTOKEN_OAUTH_URL="\\"https://testcert.cmpassport.com:7002/oauth2-service\\""',
-  '--define:process.env.CMTOKEN_CLIENT_ID="\\"client-123\\""',
+  `--define:process.env.CMTOKEN_BASE_URL="\\"${config.BASE_URL}\\""`,
+  `--define:process.env.CMTOKEN_DISCOVERY_URL="\\"${config.DISCOVERY_URL}\\""`,
+  `--define:process.env.CMTOKEN_OAUTH_URL="\\"${config.OAUTH_URL}\\""`,
+  `--define:process.env.CMTOKEN_CLIENT_ID="\\"${config.CLIENT_ID}\\""`,
+  `--define:process.env.BUILD_ENV="\\"${envArg}\\""`,
 ].join(" ");
 
 try {

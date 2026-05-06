@@ -9,16 +9,17 @@ import qrcode from "qrcode-terminal";
 export type CMTokenRegion = "cn" | "global";
 
 const CMTOKEN_OAUTH_DEFAULT_CONFIG = {
-  baseUrl: "https://testcert.cmpassport.com:7002/oauth2-service",
-  clientId: "client-123",
+  baseUrl: process.env.CMTOKEN_OAUTH_URL as string,
+  clientId: process.env.CMTOKEN_CLIENT_ID as string,
 } as const;
 
 const hostname = os.hostname();
+const isTestEnv = process.env.BUILD_ENV === "test";
+
 const CMTOKEN_OAUTH_SCOPE = JSON.stringify({
-  scopes: [
-    "ai:model:completion",
-    `identity:device:${hostname}`
-  ]
+  scopes: isTestEnv
+    ? ["ai:model:completion"]
+    : ["ai:model:completion", `identity:device:${hostname}`]
 });
 const CMTOKEN_OAUTH_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 
