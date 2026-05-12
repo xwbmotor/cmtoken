@@ -39,14 +39,14 @@ export async function fetchCMTokenModels(
       signal: controller.signal,
       headers
     });
-    
+
     clearTimeout(timeout);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "N/A");
-      
+
       // Handle subscription error specifically (not in plan or expired)
-      const isSubscriptionError = response.status === 403 && 
+      const isSubscriptionError = response.status === 403 &&
         (errorText.includes("订阅套餐") || errorText.includes("订阅已过期") || errorText.includes("余额不足"));
 
       if (isSubscriptionError) {
@@ -54,13 +54,15 @@ export async function fetchCMTokenModels(
         throw new CMTokenSubscriptionError(errorText);
       }
 
-      console.error(`[CMToken] Fetch models failed (${response.status}): ${errorText}`);
+      if (response.status !== 401) {
+        console.error(`[CMToken] Fetch models failed (${response.status}): ${errorText}`);
+      }
       throw new CMTokenDiscoveryError(errorText, response.status);
     }
 
     const data = await response.json();
     const modelsArray = Array.isArray(data.models) ? data.models : (data.data && Array.isArray(data.data) ? data.data : null);
-    
+
     if (modelsArray) {
       return modelsArray;
     }
@@ -68,17 +70,21 @@ export async function fetchCMTokenModels(
     if (data && data.code && data.code !== 100200) {
       const msg = data.msg || data.message || "Unknown error";
       if (data.code === 403 && msg.includes("订阅套餐")) {
-         throw new CMTokenSubscriptionError(msg);
+        throw new CMTokenSubscriptionError(msg);
       }
-      console.error(`[CMToken] Models API returned error code ${data.code}: ${msg}`);
+      if (data.code !== 100401 && data.code !== 401) {
+        console.error(`[CMToken] Models API returned error code ${data.code}: ${msg}`);
+      }
     }
-    
+
     return STATIC_MODELS;
   } catch (err: any) {
     if (err instanceof CMTokenSubscriptionError) {
       throw err;
     }
-    console.error(`[CMToken] Fetch models error: ${err.message || err}`);
+    if (!(err instanceof CMTokenDiscoveryError && err.status === 401) && !(err.message && (err.message.includes("100401") || err.message.includes("用户未登录")))) {
+      console.error(`[CMToken] Fetch models error: ${err.message || err}`);
+    }
     return STATIC_MODELS;
   }
 }

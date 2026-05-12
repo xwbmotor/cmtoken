@@ -10,5 +10,11 @@
     "DISCOVERY_URL": "http://your-prod-discovery-url.com",
     "OAUTH_URL": "http://your-prod-oauth-url.com",
     "CLIENT_ID": "your-prod-client-id"
+  },
+  "pre": {
+    "BASE_URL": "http://your-pre-api-base.com",
+    "DISCOVERY_URL": "http://your-pre-discovery-url.com",
+    "OAUTH_URL": "http://your-pre-oauth-url.com",
+    "CLIENT_ID": "your-pre-client-id"
   }
 }

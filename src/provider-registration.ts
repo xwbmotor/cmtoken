@@ -54,6 +54,13 @@ async function resolveApiCatalog(ctx: ProviderCatalogContext) {
     const { fetchCMTokenModels, CMTokenSubscriptionError, CMTokenDiscoveryError } = await import("./discovery.js");
     const auth = ctx.resolveProviderAuth(PROVIDER_ID);
     const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
+    
+    // Skip discovery if we don't have a valid-looking token yet (avoids noisy 401s during setup)
+    if (!token || token.length < 16 || token === "undefined" || token === "null") {
+       trace("Skipping CMToken discovery: No valid token available yet.");
+       return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
+    }
+
     const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, token);
     if (rawModels && rawModels.length > 0) {
       finalModels = rawModels.map((m: any) => ({
