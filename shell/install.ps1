@@ -418,7 +418,7 @@ try {
   const r = JSON.parse('$responseStr');
   if (r.code === 200 || r.status === 'success') {
     const data = r.data || {};
-    console.log('SUCCESS|' + (data.device_token || '') + '|' + (data.pair_token || ''));
+    console.log('SUCCESS|' + (data.device_token || '') + '|' + (data.pair_token || '') + '|' + (data.api_base || '') + '|' + (data.expires_in || '7200'));
   } else {
     console.log('ERROR|' + (r.msg || r.message || '未知错误'));
   }
@@ -440,6 +440,11 @@ if ($parts[0] -eq "ERROR") {
 
 $deviceToken = $parts[1]
 $pairToken = $parts[2]
+$apiBase = $parts[3]
+if ([string]::IsNullOrEmpty($apiBase)) {
+    $apiBase = $ExchangeUrl.Substring(0, $ExchangeUrl.IndexOf("/open/v1")) + "/open/v1"
+}
+$expiresIn = $parts[4]
 log-success "🎉 令牌换券成功，已授权该实例！"
 
 # ── 7. 安装 CMToken 与 Tuken 插件 ───────────────────────────────────────────
@@ -452,7 +457,7 @@ if ($isPluginOnly) {
     $cmtokenTgz = Get-ChildItem -Path $stagingDir -Filter "*cmtoken*.tgz" | Select-Object -First 1
     $tukenTgz = Get-ChildItem -Path $stagingDir -Filter "*tuken*.tgz" | Select-Object -First 1
     if (!$cmtokenTgz -or !$tukenTgz) {
-        log-error "未在解压的离线包中找到插件安装包！"
+        log-error "未在解压 of 离线包中找到插件安装包！"
         exit 1
     }
     $resolvedCmtokenTgz = $cmtokenTgz.FullName
@@ -473,7 +478,7 @@ if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
 }
 
 # ── 8. 模型与渠道自动配对 ─────────────────────────────────────────────────────
-log-info "正在进行模型与渠道免配置自动连通绑定..."
+log-info "正在进行模型与渠道免配置自动连通绑定并执行模型自适应配置..."
 $baseUrl = $ExchangeUrl.Substring(0, $ExchangeUrl.IndexOf("/open/v1"))
 
 $configScript = @"
@@ -487,50 +492,171 @@ if (!fs.existsSync(agentDir)) {
   fs.mkdirSync(agentDir, { recursive: true });
 }
 
-// 1. 写入 openclaw.json
-const openclawJsonPath = path.join(clawDir, 'openclaw.json');
-let openclawJson = {};
-if (fs.existsSync(openclawJsonPath)) {
-  try { openclawJson = JSON.parse(fs.readFileSync(openclawJsonPath, 'utf8')); } catch(e) {}
-}
-openclawJson.plugins = openclawJson.plugins || {};
-openclawJson.plugins.entries = openclawJson.plugins.entries || {};
+(async () => {
+  const deviceToken = "$deviceToken";
+  const pairToken = "$pairToken";
+  const hostId = "$hostId";
+  const apiBase = "$apiBase";
+  const exchangeUrl = "$ExchangeUrl";
 
-// 配置 CMToken 插件 (非破坏性合并)
-openclawJson.plugins.entries['cmtoken'] = openclawJson.plugins.entries['cmtoken'] || {};
-openclawJson.plugins.entries['cmtoken'].enabled = true;
-openclawJson.plugins.entries['cmtoken'].config = openclawJson.plugins.entries['cmtoken'].config || {};
-openclawJson.plugins.entries['cmtoken'].config.appId = "$hostId";
-openclawJson.plugins.entries['cmtoken'].config.appSecret = "$pairToken";
-openclawJson.plugins.entries['cmtoken'].config.defaultModel = "cmtoken/minmax";
-openclawJson.plugins.entries['cmtoken'].config.oauth = openclawJson.plugins.entries['cmtoken'].config.oauth || {};
-openclawJson.plugins.entries['cmtoken'].config.oauth.client_id = "$hostId";
-openclawJson.plugins.entries['cmtoken'].config.oauth.client_secret = "$pairToken";
+  let finalModelsList = [
+    {
+      id: 'minmax',
+      name: 'minmax',
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 192000,
+      maxTokens: 8192
+    }
+  ];
+  let firstModelId = 'minmax';
+  let activeAccessToken = 'initial_activation_token';
+  let tokenExpiresIn = parseInt("$expiresIn") || 7200;
 
-// 配置 Tuken 渠道 (非破坏性合并)
-openclawJson.plugins.entries['tuken'] = openclawJson.plugins.entries['tuken'] || {};
-openclawJson.plugins.entries['tuken'].enabled = true;
-openclawJson.plugins.entries['tuken'].config = openclawJson.plugins.entries['tuken'].config || {};
-openclawJson.plugins.entries['tuken'].config.baseUrl = "$baseUrl";
-openclawJson.plugins.entries['tuken'].config.appId = "$hostId";
-openclawJson.plugins.entries['tuken'].config.appSecret = "$pairToken";
-openclawJson.plugins.entries['tuken'].config.instanceId = "$hostId";
+  // 1. 确定 OAUTH_URL
+  let oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
+  if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
+    oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
+  }
 
-fs.writeFileSync(openclawJsonPath, JSON.stringify(openclawJson, null, 2), 'utf8');
+  // 2. 使用 Refresh Token 换取首任 Access Token 并自动发现可用模型
+  try {
+    const tokenUrl = oauthUrl + '/oauth/device/token';
+    const discoveryUrl = apiBase + '/models';
 
-// 2. 写入 auth-profiles.json (激活中移 OAuth refresh token)
-const authProfilesPath = path.join(agentDir, 'auth-profiles.json');
-let authProfiles = {};
-if (fs.existsSync(authProfilesPath)) {
-  try { authProfiles = JSON.parse(fs.readFileSync(authProfilesPath, 'utf8')); } catch(e) {}
-}
-authProfiles.profiles = authProfiles.profiles || {};
-authProfiles.profiles['cmtoken:default'] = {
-  refresh: "$deviceToken",
-  access: "",
-  expiresAt: 0
-};
-fs.writeFileSync(authProfilesPath, JSON.stringify(authProfiles, null, 2), 'utf8');
+    const tokenParams = new URLSearchParams();
+    tokenParams.append('grant_type', 'refresh_token');
+    tokenParams.append('client_id', hostId);
+    tokenParams.append('client_secret', pairToken);
+    tokenParams.append('refresh_token', deviceToken);
+
+    const tokenRes = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: tokenParams.toString()
+    });
+
+    if (tokenRes.ok) {
+      const tokenData = await tokenRes.json();
+      if (tokenData.access_token) {
+        activeAccessToken = tokenData.access_token;
+        if (tokenData.expires_in) {
+          tokenExpiresIn = parseInt(tokenData.expires_in);
+        }
+
+        console.log('📡 正在与中移认证中心交互，自动发现模型列表...');
+        const modelsRes = await fetch(discoveryUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer ' + activeAccessToken
+          }
+        });
+
+        if (modelsRes.ok) {
+          const modelsData = await modelsRes.json();
+          const rawModels = Array.isArray(modelsData.models) ? modelsData.models : (modelsData.data && Array.isArray(modelsData.data) ? modelsData.data : null);
+          if (rawModels && rawModels.length > 0) {
+            finalModelsList = rawModels.map(m => ({
+              id: m.id,
+              name: m.name || m.id,
+              reasoning: false,
+              input: ['text'],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: m.contextWindow || 192000,
+              maxTokens: m.maxTokens || 8192
+            }));
+            firstModelId = finalModelsList[0].id;
+            console.log('✅ 成功自动载入中移可用 AI 模型列表: ' + finalModelsList.map(m => m.id).join(', '));
+          }
+        } else {
+          console.warn('⚠️ 获取模型列表失败，状态码:', modelsRes.status);
+        }
+      } else {
+        console.warn('⚠️ 换取 Access Token 响应异常，缺 access_token 字段');
+      }
+    } else {
+      console.warn('⚠️ 换取 Access Token 失败，状态码:', tokenRes.status);
+    }
+  } catch (err) {
+    console.warn('⚠️ 自适应拉取中移模型列表异常，将回退至内置默认配置。错误:', err.message);
+  }
+
+  // 1. 写入 openclaw.json
+  const openclawJsonPath = path.join(clawDir, 'openclaw.json');
+  let openclawJson = {};
+  if (fs.existsSync(openclawJsonPath)) {
+    try { openclawJson = JSON.parse(fs.readFileSync(openclawJsonPath, 'utf8')); } catch(e) {}
+  }
+  openclawJson.plugins = openclawJson.plugins || {};
+  openclawJson.plugins.entries = openclawJson.plugins.entries || {};
+
+  // 配置 CMToken 插件 (非破坏性合并)
+  openclawJson.plugins.entries['cmtoken'] = openclawJson.plugins.entries['cmtoken'] || {};
+  openclawJson.plugins.entries['cmtoken'].enabled = true;
+  openclawJson.plugins.entries['cmtoken'].config = openclawJson.plugins.entries['cmtoken'].config || {};
+  openclawJson.plugins.entries['cmtoken'].config.appId = hostId;
+  openclawJson.plugins.entries['cmtoken'].config.appSecret = pairToken;
+  openclawJson.plugins.entries['cmtoken'].config.defaultModel = 'cmtoken/' + firstModelId;
+  openclawJson.plugins.entries['cmtoken'].config.oauth = openclawJson.plugins.entries['cmtoken'].config.oauth || {};
+  openclawJson.plugins.entries['cmtoken'].config.oauth.client_id = hostId;
+  openclawJson.plugins.entries['cmtoken'].config.oauth.client_secret = pairToken;
+
+  // 写入 providers models 列表
+  openclawJson.models = openclawJson.models || {};
+  openclawJson.models.providers = openclawJson.models.providers || {};
+  openclawJson.models.providers.cmtoken = openclawJson.models.providers.cmtoken || {};
+  openclawJson.models.providers.cmtoken.baseUrl = apiBase;
+  openclawJson.models.providers.cmtoken.api = 'openai-completions';
+  openclawJson.models.providers.cmtoken.models = finalModelsList;
+
+  // 绑定 CMToken 认证到 oauth profile
+  openclawJson.auth = openclawJson.auth || {};
+  openclawJson.auth.profiles = openclawJson.auth.profiles || {};
+  openclawJson.auth.profiles['cmtoken:default'] = {
+    provider: 'cmtoken',
+    mode: 'oauth'
+  };
+
+  // 设置 CMToken 为智能体默认首选模型
+  openclawJson.agents = openclawJson.agents || {};
+  openclawJson.agents.defaults = openclawJson.agents.defaults || {};
+  openclawJson.agents.defaults.models = openclawJson.agents.defaults.models || {};
+  openclawJson.agents.defaults.models['cmtoken/' + firstModelId] = {};
+
+  // 配置 Tuken 渠道 (非破坏性合并)
+  openclawJson.plugins.entries['tuken'] = openclawJson.plugins.entries['tuken'] || {};
+  openclawJson.plugins.entries['tuken'].enabled = true;
+  openclawJson.plugins.entries['tuken'].config = openclawJson.plugins.entries['tuken'].config || {};
+  openclawJson.plugins.entries['tuken'].config.baseUrl = "$baseUrl";
+  openclawJson.plugins.entries['tuken'].config.appId = hostId;
+  openclawJson.plugins.entries['tuken'].config.appSecret = pairToken;
+  openclawJson.plugins.entries['tuken'].config.instanceId = hostId;
+
+  fs.writeFileSync(openclawJsonPath, JSON.stringify(openclawJson, null, 2), 'utf8');
+
+  // 2. 写入 auth-profiles.json (激活中移 OAuth access + refresh token)
+  const authProfilesPath = path.join(agentDir, 'auth-profiles.json');
+  let authProfiles = {};
+  if (fs.existsSync(authProfilesPath)) {
+    try { authProfiles = JSON.parse(fs.readFileSync(authProfilesPath, 'utf8')); } catch(e) {}
+  }
+  authProfiles.profiles = authProfiles.profiles || {};
+  authProfiles.profiles['cmtoken:default'] = {
+    type: 'oauth',
+    provider: 'cmtoken',
+    access: activeAccessToken,
+    refresh: deviceToken,
+    expires: Date.now() + tokenExpiresIn * 1000
+  };
+  fs.writeFileSync(authProfilesPath, JSON.stringify(authProfiles, null, 2), 'utf8');
+})().catch(e => {
+  console.error('❌ 配对及模型自适应流程执行发生致命异常:', e);
+  process.exit(1);
+});
 "@
 
 $configScriptFile = "$InstallDir\config.js"
