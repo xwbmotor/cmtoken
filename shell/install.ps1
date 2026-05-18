@@ -358,17 +358,27 @@ if (Test-Path $hostIdFile) {
 }
 log-success "宿主机 Host ID: $hostId"
 
-# ── 6. 定位激活辅助工具 ─────────────────────────────────────────────────────────
-$activateJs = ".\activate.js"
-if (Test-Path "$InstallDir\activate.js") {
-    $activateJs = "$InstallDir\activate.js"
-} elseif (Test-Path "$PSScriptRoot\activate.js") {
-    $activateJs = "$PSScriptRoot\activate.js"
+# ── 6. 还原激活辅助工具 ─────────────────────────────────────────────────────────
+$activateJsBase64 = "__ACTIVATE_JS_BASE64_PLACEHOLDER__"
+
+$activateJs = "$InstallDir\activate.js"
+if (![string]::IsNullOrEmpty($activateJsBase64) -and ($activateJsBase64 -ne "__ACTIVATE_JS_BASE64_PLACEHOLDER__")) {
+    log-info "正在从内嵌载荷还原激活辅助工具..."
+    [System.IO.File]::WriteAllText($activateJs, [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($activateJsBase64)))
 }
 
-if ((Test-Path ".\activate.js") -and !(Test-Path "$InstallDir\activate.js") -and !$isPluginOnly) {
-    Copy-Item ".\activate.js" -Destination "$InstallDir\activate.js" -Force | Out-Null
-    $activateJs = "$InstallDir\activate.js"
+# 兜底开发模式本地测试 (如果内嵌数据没有被编译或者是开发调试中，回退读取本地文件)
+if (!(Test-Path $activateJs)) {
+    if (Test-Path ".\activate.js") {
+        Copy-Item ".\activate.js" -Destination $activateJs -Force | Out-Null
+    } elseif (Test-Path "$PSScriptRoot\activate.js") {
+        Copy-Item "$PSScriptRoot\activate.js" -Destination $activateJs -Force | Out-Null
+    }
+}
+
+if (!(Test-Path $activateJs)) {
+    log-error "未能在安装包中定位到 activate.js 激活器脚本！"
+    exit 1
 }
 
 # ── 7. 安装 CMToken 与 Tuken 插件 ───────────────────────────────────────────

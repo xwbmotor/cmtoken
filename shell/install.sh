@@ -589,17 +589,37 @@ else
     log_success "成功为本机生成唯一 Host ID: ${HOST_ID}"
 fi
 
-# ── 6. 定位激活辅助工具 ──────────────────────────────────────────────────────────
-ACTIVATE_JS="./activate.js"
-if [ -f "$INSTALL_DIR/activate.js" ]; then
-    ACTIVATE_JS="$INSTALL_DIR/activate.js"
-elif [ -f "$(pwd)/activate.js" ]; then
-    ACTIVATE_JS="$(pwd)/activate.js"
+# ── 6. 还原激活辅助工具 ──────────────────────────────────────────────────────────
+ACTIVATE_JS_BASE64="__ACTIVATE_JS_BASE64_PLACEHOLDER__"
+
+ACTIVATE_JS="$INSTALL_DIR/activate.js"
+if [ -n "$ACTIVATE_JS_BASE64" ] && [ "$ACTIVATE_JS_BASE64" != "__ACTIVATE_JS_BASE64_PLACEHOLDER__" ]; then
+    log_info "正在从内嵌载荷还原激活辅助工具..."
+    
+    # 确定 Node.js 可执行路径
+    NODE_EXEC="node"
+    if [ -f "$INSTALL_DIR/node-portable/bin/node" ]; then
+        NODE_EXEC="$INSTALL_DIR/node-portable/bin/node"
+    elif command -v node >/dev/null 2>&1; then
+        NODE_EXEC="node"
+    fi
+    
+    # 使用 Node.js 本身来解码 Base64 字符串以保证绝对的跨平台一致性，不受系统 base64 工具链版本差异影响
+    "$NODE_EXEC" -e "require('fs').writeFileSync('$ACTIVATE_JS', Buffer.from('$ACTIVATE_JS_BASE64', 'base64').toString('utf8'))" 2>/dev/null
 fi
 
-if [ -f "./activate.js" ] && [ ! -f "$INSTALL_DIR/activate.js" ] && [ "$IS_PLUGIN_ONLY" = false ]; then
-    cp "./activate.js" "$INSTALL_DIR/activate.js" 2>/dev/null || true
-    ACTIVATE_JS="$INSTALL_DIR/activate.js"
+# 兜底开发模式本地测试 (如果内嵌数据没有被编译或者是开发调试中，回退读取本地文件)
+if [ ! -f "$ACTIVATE_JS" ]; then
+    if [ -f "./activate.js" ]; then
+        cp "./activate.js" "$ACTIVATE_JS" 2>/dev/null || true
+    elif [ -f "$(pwd)/activate.js" ]; then
+        cp "$(pwd)/activate.js" "$ACTIVATE_JS" 2>/dev/null || true
+    fi
+fi
+
+if [ ! -f "$ACTIVATE_JS" ]; then
+    log_error "未能在安装包中定位到 activate.js 激活器脚本！"
+    exit 1
 fi
 
 # ── 7. 安装 CMToken 与 Tuken 插件 ───────────────────────────────────────────

@@ -19,7 +19,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, copyFileSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, copyFileSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -186,13 +186,29 @@ for (const platform of targetPlatforms) {
 // Copy deployment scripts into shell/releases to unify distribution files
 logStep("Copying installer scripts to unified releases folder...");
 ensureDir(RELEASES_DIR);
+
+// Read and encode activate.js to base64 for self-contained deployment
+const activateJsSrc = resolve(ROOT, "shell/activate.js");
+let activateJsBase64 = "";
+if (existsSync(activateJsSrc)) {
+  const activateJsContent = readFileSync(activateJsSrc, "utf8");
+  activateJsBase64 = Buffer.from(activateJsContent).toString("base64");
+}
+
 const scriptsToCopy = ["install.sh", "install.bat", "install.ps1", "activate.js", "README.md"];
 for (const script of scriptsToCopy) {
   const src = resolve(ROOT, "shell", script);
   const dest = resolve(RELEASES_DIR, script);
   if (existsSync(src)) {
-    copyFileSync(src, dest);
-    console.log(`  Copied: ${script} -> shell/releases/`);
+    if (script === "install.sh" || script === "install.ps1") {
+      let content = readFileSync(src, "utf8");
+      content = content.replace(/__ACTIVATE_JS_BASE64_PLACEHOLDER__/g, activateJsBase64);
+      writeFileSync(dest, content, "utf8");
+      console.log(`  Compiled and Copied: ${script} -> shell/releases/ (with inline activate.js)`);
+    } else {
+      copyFileSync(src, dest);
+      console.log(`  Copied: ${script} -> shell/releases/`);
+    }
   }
 }
 
