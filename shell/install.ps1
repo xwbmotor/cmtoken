@@ -496,30 +496,25 @@ if (fs.existsSync(openclawJsonPath)) {
 openclawJson.plugins = openclawJson.plugins || {};
 openclawJson.plugins.entries = openclawJson.plugins.entries || {};
 
-// 配置 CMToken 插件
-openclawJson.plugins.entries['cmtoken'] = {
-  enabled: true,
-  config: {
-    appId: "$hostId",
-    appSecret: "$pairToken",
-    defaultModel: "cmtoken/minmax",
-    oauth: {
-      client_id: "$hostId",
-      client_secret: "$pairToken"
-    }
-  }
-};
+// 配置 CMToken 插件 (非破坏性合并)
+openclawJson.plugins.entries['cmtoken'] = openclawJson.plugins.entries['cmtoken'] || {};
+openclawJson.plugins.entries['cmtoken'].enabled = true;
+openclawJson.plugins.entries['cmtoken'].config = openclawJson.plugins.entries['cmtoken'].config || {};
+openclawJson.plugins.entries['cmtoken'].config.appId = "$hostId";
+openclawJson.plugins.entries['cmtoken'].config.appSecret = "$pairToken";
+openclawJson.plugins.entries['cmtoken'].config.defaultModel = "cmtoken/minmax";
+openclawJson.plugins.entries['cmtoken'].config.oauth = openclawJson.plugins.entries['cmtoken'].config.oauth || {};
+openclawJson.plugins.entries['cmtoken'].config.oauth.client_id = "$hostId";
+openclawJson.plugins.entries['cmtoken'].config.oauth.client_secret = "$pairToken";
 
-// 配置 Tuken 渠道
-openclawJson.plugins.entries['tuken'] = {
-  enabled: true,
-  config: {
-    baseUrl: "$baseUrl",
-    appId: "$hostId",
-    appSecret: "$pairToken",
-    instanceId: "$hostId"
-  }
-};
+// 配置 Tuken 渠道 (非破坏性合并)
+openclawJson.plugins.entries['tuken'] = openclawJson.plugins.entries['tuken'] || {};
+openclawJson.plugins.entries['tuken'].enabled = true;
+openclawJson.plugins.entries['tuken'].config = openclawJson.plugins.entries['tuken'].config || {};
+openclawJson.plugins.entries['tuken'].config.baseUrl = "$baseUrl";
+openclawJson.plugins.entries['tuken'].config.appId = "$hostId";
+openclawJson.plugins.entries['tuken'].config.appSecret = "$pairToken";
+openclawJson.plugins.entries['tuken'].config.instanceId = "$hostId";
 
 fs.writeFileSync(openclawJsonPath, JSON.stringify(openclawJson, null, 2), 'utf8');
 
