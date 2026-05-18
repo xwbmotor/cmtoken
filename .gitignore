@@ -8,3 +8,4 @@ dist/
 .cache/
 environments.json
 releases/
+doc/

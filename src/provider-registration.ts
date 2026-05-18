@@ -18,8 +18,6 @@ import { CMTOKEN_DEFAULT_MODEL_ID } from "./provider-models.js";
 const PROVIDER_ID = "cmtoken";
 const PROVIDER_LABEL = "CMToken";
 
-
-
 const DEFAULT_DISCOVERY_URL = process.env.CMTOKEN_DISCOVERY_URL as string;
 const DEFAULT_BASE_URL = process.env.CMTOKEN_BASE_URL as string;
 
