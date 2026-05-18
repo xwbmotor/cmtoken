@@ -589,71 +589,17 @@ else
     log_success "成功为本机生成唯一 Host ID: ${HOST_ID}"
 fi
 
-# ── 6. 执行 POST 请求换券 (Token Exchange) ───────────────────────────────────
-log_info "正在向兔啃平台发起换券校验请求..."
-
-HOST_NAME="$(hostname || echo 'unknown-host')"
-OS_INFO="$(uname -s -r || echo 'unknown-os')"
-CLIENT_VERSION="v1.0.0"
-
-JSON_BODY=$(cat <<EOF
-{
-  "temp_token": "${TEMP_TOKEN}",
-  "host_id": "${HOST_ID}",
-  "host_name": "${HOST_NAME}",
-  "client_version": "${CLIENT_VERSION}",
-  "os": "${OS_INFO}"
-}
-EOF
-)
-
-log_info "提交载荷: ${JSON_BODY}"
-
-RESPONSE=$(curl ${INSECURE_CURL} -s -X POST \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d "$JSON_BODY" \
-  "${DEPLOY_EXCHANGE_URL}")
-
-if [ -z "$RESPONSE" ]; then
-    log_error "向换券服务请求失败，无响应返回！"
-    exit 1
+# ── 6. 定位激活辅助工具 ──────────────────────────────────────────────────────────
+ACTIVATE_JS="./activate.js"
+if [ -f "$INSTALL_DIR/activate.js" ]; then
+    ACTIVATE_JS="$INSTALL_DIR/activate.js"
+elif [ -f "$(pwd)/activate.js" ]; then
+    ACTIVATE_JS="$(pwd)/activate.js"
 fi
 
-log_info "服务端响应: ${RESPONSE}"
-
-# 校验并提取响应参数
-CODE=$(node -e "
-try {
-  const r = ${RESPONSE};
-  console.log(r.code || r.status || '');
-} catch(e) {
-  console.log('parse_error');
-}
-")
-
-if [ "$CODE" != "200" ] && [ "$CODE" != "success" ]; then
-    MSG=$(node -e "try { console.log((${RESPONSE}).msg || (${RESPONSE}).message || '未知错误'); } catch(e) {}")
-    log_error "激活换券失败！状态码: ${CODE}, 原因: ${MSG}"
-    exit 1
-fi
-
-log_success "🎉 令牌换券成功，已授权该实例！"
-
-# 提取关键凭证与配置
-DEVICE_TOKEN=$(node -e "console.log((${RESPONSE}).data?.device_token || '')")
-EXPIRES_IN=$(node -e "console.log((${RESPONSE}).data?.expires_in || 7200)")
-PAIR_TOKEN=$(node -e "console.log((${RESPONSE}).data?.pair_token || '')")
-API_BASE=$(node -e "console.log((${RESPONSE}).data?.api_base || '')")
-OAUTH_URL_FROM_EXCHANGE=$(node -e "console.log((${RESPONSE}).data?.oauth_url || (${RESPONSE}).data?.oauth_base || '')")
-
-if [ -z "$OAUTH_URL" ]; then
-    OAUTH_URL="$OAUTH_URL_FROM_EXCHANGE"
-fi
-
-if [ -z "$DEVICE_TOKEN" ] || [ -z "$PAIR_TOKEN" ]; then
-    log_error "响应凭证不完整，缺少 device_token 或 pair_token。"
-    exit 1
+if [ -f "./activate.js" ] && [ ! -f "$INSTALL_DIR/activate.js" ] && [ "$IS_PLUGIN_ONLY" = false ]; then
+    cp "./activate.js" "$INSTALL_DIR/activate.js" 2>/dev/null || true
+    ACTIVATE_JS="$INSTALL_DIR/activate.js"
 fi
 
 # ── 7. 安装 CMToken 与 Tuken 插件 ───────────────────────────────────────────
@@ -683,215 +629,27 @@ fi
 # ── 8. 走 CMToken 模型自动配置和渠道自动配对流程 ──────────────────────────────
 log_info "正在写入零配置系统配对数据并执行模型自适应配置..."
 
-# 运行 Node.js 脚本来进行精准的 JSON 更新，以绝对安全的方式修改 openclaw.json 和 auth-profiles.json
-node -e "
-const fs = require('fs');
-const path = require('path');
+NODE_EXEC="node"
+if [ -f "$INSTALL_DIR/node-portable/bin/node" ]; then
+    NODE_EXEC="$INSTALL_DIR/node-portable/bin/node"
+fi
 
-const homeDir = process.env.HOME || process.env.USERPROFILE;
+IS_INSECURE_FLAG="false"
+if [ -n "$INSECURE_CURL" ]; then
+    IS_INSECURE_FLAG="true"
+fi
 
-// 开启证书绕过以防内网拦截
-if ('$INSECURE_CURL' === 'true' || '$INSECURE_CURL') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
+"$NODE_EXEC" "$ACTIVATE_JS" \
+    --host-id "$HOST_ID" \
+    --temp-token "$TEMP_TOKEN" \
+    --exchange-url "$DEPLOY_EXCHANGE_URL" \
+    --oauth-url "$OAUTH_URL" \
+    --insecure "$IS_INSECURE_FLAG"
 
-(async () => {
-  const deviceToken = '$DEVICE_TOKEN';
-  const pairToken = '$PAIR_TOKEN';
-  const hostId = '$HOST_ID';
-  const apiBase = '$API_BASE';
-  const exchangeUrl = '$DEPLOY_EXCHANGE_URL';
-
-  let finalModelsList = [
-    {
-      id: 'minmax',
-      name: 'minmax',
-      reasoning: false,
-      input: ['text'],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 192000,
-      maxTokens: 8192
-    }
-  ];
-  let firstModelId = 'minmax';
-  let activeAccessToken = 'initial_activation_token';
-  let tokenExpiresIn = parseInt('$EXPIRES_IN') || 7200;
-
-  // 1. 确定 OAUTH_URL
-  let oauthUrl = '$OAUTH_URL';
-  if (!oauthUrl) {
-     oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
-  }
-
-  // 2. 使用 Refresh Token 换取首任 Access Token 并自动发现可用模型
-  try {
-    const tokenUrl = oauthUrl + '/oauth/device/token';
-    const discoveryUrl = apiBase + '/models';
-
-    const tokenParams = new URLSearchParams();
-    tokenParams.append('grant_type', 'refresh_token');
-    tokenParams.append('client_id', hostId);
-    tokenParams.append('client_secret', pairToken);
-    tokenParams.append('refresh_token', deviceToken);
-
-    const tokenRes = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json'
-      },
-      body: tokenParams.toString()
-    });
-
-    if (tokenRes.ok) {
-      const tokenData = await tokenRes.json();
-      if (tokenData.access_token) {
-        activeAccessToken = tokenData.access_token;
-        if (tokenData.expires_in) {
-          tokenExpiresIn = parseInt(tokenData.expires_in);
-        }
-
-        console.log('📡 正在与中移认证中心交互，自动发现模型列表...');
-        const modelsRes = await fetch(discoveryUrl, {
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Bearer ' + activeAccessToken
-          }
-        });
-
-        if (modelsRes.ok) {
-          const modelsData = await modelsRes.json();
-          const rawModels = Array.isArray(modelsData.models) ? modelsData.models : (modelsData.data && Array.isArray(modelsData.data) ? modelsData.data : null);
-          if (rawModels && rawModels.length > 0) {
-            finalModelsList = rawModels.map(m => ({
-              id: m.id,
-              name: m.name || m.id,
-              reasoning: false,
-              input: ['text'],
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-              contextWindow: m.contextWindow || 192000,
-              maxTokens: m.maxTokens || 8192
-            }));
-            firstModelId = finalModelsList[0].id;
-            console.log('✅ 成功自动载入中移可用 AI 模型列表: ' + finalModelsList.map(m => m.id).join(', '));
-          }
-        } else {
-          console.warn('⚠️ 获取模型列表失败，状态码:', modelsRes.status);
-        }
-      } else {
-        console.warn('⚠️ 换取 Access Token 响应异常，缺 access_token 字段');
-      }
-    } else {
-      console.warn('⚠️ 换取 Access Token 失败，状态码:', tokenRes.status);
-    }
-  } catch (err) {
-    console.warn('⚠️ 自适应拉取中移模型列表异常，将回退至内置默认配置。错误:', err.message);
-  }
-
-  // 1. 更新 openclaw.json
-  const openclawJsonPath = path.join(homeDir, '.openclaw', 'openclaw.json');
-  let config = {};
-  if (fs.existsSync(openclawJsonPath)) {
-    try {
-      config = JSON.parse(fs.readFileSync(openclawJsonPath, 'utf8'));
-    } catch (e) {
-      console.warn('⚠️ 现有 openclaw.json 格式异常，将覆盖');
-    }
-  }
-
-  config.plugins = config.plugins || {};
-  config.plugins.entries = config.plugins.entries || {};
-
-  // 开启 CMToken 插件 (非破坏性合并)
-  config.plugins.entries.cmtoken = config.plugins.entries.cmtoken || {};
-  config.plugins.entries.cmtoken.enabled = true;
-  config.plugins.entries.cmtoken.config = config.plugins.entries.cmtoken.config || {};
-  if (apiBase) {
-    config.plugins.entries.cmtoken.config.baseUrl = apiBase;
-  }
-  config.plugins.entries.cmtoken.config.appId = hostId;
-  config.plugins.entries.cmtoken.config.appSecret = pairToken;
-  config.plugins.entries.cmtoken.config.defaultModel = 'cmtoken/' + firstModelId;
-  config.plugins.entries.cmtoken.config.oauth = config.plugins.entries.cmtoken.config.oauth || {};
-  config.plugins.entries.cmtoken.config.oauth.client_id = hostId;
-  config.plugins.entries.cmtoken.config.oauth.client_secret = pairToken;
-
-  // 写入 providers models 列表
-  config.models = config.models || {};
-  config.models.providers = config.models.providers || {};
-  config.models.providers.cmtoken = config.models.providers.cmtoken || {};
-  config.models.providers.cmtoken.baseUrl = apiBase;
-  config.models.providers.cmtoken.api = 'openai-completions';
-  config.models.providers.cmtoken.models = finalModelsList;
-
-  // 绑定 CMToken 认证到 oauth profile
-  config.auth = config.auth || {};
-  config.auth.profiles = config.auth.profiles || {};
-  config.auth.profiles['cmtoken:default'] = {
-    provider: 'cmtoken',
-    mode: 'oauth'
-  };
-
-  // 设置 CMToken 为智能体默认首选模型
-  config.agents = config.agents || {};
-  config.agents.defaults = config.agents.defaults || {};
-  config.agents.defaults.models = config.agents.defaults.models || {};
-  config.agents.defaults.models['cmtoken/' + firstModelId] = {};
-
-  // 开启并自动配对 Tuken 渠道
-  config.plugins.entries.tuken = config.plugins.entries.tuken || {};
-  config.plugins.entries.tuken.enabled = true;
-
-  // 自动填充渠道参数实现配对
-  config.channels = config.channels || {};
-  config.channels.tuken = config.channels.tuken || {};
-  config.channels.tuken.enabled = true;
-
-  // 从部署接口地址推导 兔啃 渠道连接的 baseUrl
-  let hubBaseUrl = '';
-  try {
-    const u = new URL(exchangeUrl);
-    hubBaseUrl = u.origin + u.pathname.substring(0, u.pathname.lastIndexOf('/deploy/exchange'));
-  } catch (e) {}
-
-  config.channels.tuken.baseUrl = hubBaseUrl || 'http://127.0.0.1:8787';
-  config.channels.tuken.appId = hostId;
-  config.channels.tuken.appSecret = pairToken;
-  config.channels.tuken.openclawInstanceId = hostId;
-  config.channels.tuken.pollTimeoutMs = 1000;
-  config.channels.tuken.heartbeatIntervalMs = 15000;
-
-  fs.mkdirSync(path.dirname(openclawJsonPath), { recursive: true });
-  fs.writeFileSync(openclawJsonPath, JSON.stringify(config, null, 2), 'utf8');
-  console.log('✅ [openclaw.json] 自动化模型与渠道配对参数更新完成！');
-
-  // 2. 更新 auth-profiles.json (激活移动认证 Access + Refresh Token)
-  const authProfilesPath = path.join(homeDir, '.openclaw', 'agents', 'main', 'agent', 'auth-profiles.json');
-  let authProfiles = { profiles: {} };
-  if (fs.existsSync(authProfilesPath)) {
-    try {
-      authProfiles = JSON.parse(fs.readFileSync(authProfilesPath, 'utf8'));
-    } catch (e) {}
-  }
-
-  authProfiles.profiles = authProfiles.profiles || {};
-  authProfiles.profiles['cmtoken:default'] = {
-    type: 'oauth',
-    provider: 'cmtoken',
-    access: activeAccessToken,
-    refresh: deviceToken,
-    expires: Date.now() + tokenExpiresIn * 1000
-  };
-
-  fs.mkdirSync(path.dirname(authProfilesPath), { recursive: true });
-  fs.writeFileSync(authProfilesPath, JSON.stringify(authProfiles, null, 2), 'utf8');
-  console.log('✅ [auth-profiles.json] 移动端换券 Refresh Token 设备激活写入完成！');
-})().catch(e => {
-  console.error('❌ 配对逻辑执行发生致命异常:', e);
-  process.exit(1);
-});
-"
-"
+if [ $? -ne 0 ]; then
+    log_error "自适应鉴权与自动配置失败！流程已中断。"
+    exit 1
+fi
 
 # 清理暂存区
 rm -rf "$STAGING_DIR"

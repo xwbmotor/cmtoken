@@ -186,7 +186,7 @@ for (const platform of targetPlatforms) {
 // Copy deployment scripts into shell/releases to unify distribution files
 logStep("Copying installer scripts to unified releases folder...");
 ensureDir(RELEASES_DIR);
-const scriptsToCopy = ["install.sh", "install.bat", "install.ps1", "README.md"];
+const scriptsToCopy = ["install.sh", "install.bat", "install.ps1", "activate.js", "README.md"];
 for (const script of scriptsToCopy) {
   const src = resolve(ROOT, "shell", script);
   const dest = resolve(RELEASES_DIR, script);
