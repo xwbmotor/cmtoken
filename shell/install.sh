@@ -56,6 +56,7 @@ log_error() {
 TEMP_TOKEN=""
 INSTALL_DIR="$HOME/.openclaw-app"
 INSECURE_CURL=""
+OAUTH_URL=""
 
 while [ "$#" -gt 0 ]; do
     case $1 in
@@ -69,6 +70,10 @@ while [ "$#" -gt 0 ]; do
             ;;
         --exchange-url)
             DEPLOY_EXCHANGE_URL="$2"
+            shift 2
+            ;;
+        --oauth-url)
+            OAUTH_URL="$2"
             shift 2
             ;;
         --pack-url)
@@ -640,6 +645,11 @@ DEVICE_TOKEN=$(node -e "console.log((${RESPONSE}).data?.device_token || '')")
 EXPIRES_IN=$(node -e "console.log((${RESPONSE}).data?.expires_in || 7200)")
 PAIR_TOKEN=$(node -e "console.log((${RESPONSE}).data?.pair_token || '')")
 API_BASE=$(node -e "console.log((${RESPONSE}).data?.api_base || '')")
+OAUTH_URL_FROM_EXCHANGE=$(node -e "console.log((${RESPONSE}).data?.oauth_url || (${RESPONSE}).data?.oauth_base || '')")
+
+if [ -z "$OAUTH_URL" ]; then
+    OAUTH_URL="$OAUTH_URL_FROM_EXCHANGE"
+fi
 
 if [ -z "$DEVICE_TOKEN" ] || [ -z "$PAIR_TOKEN" ]; then
     log_error "响应凭证不完整，缺少 device_token 或 pair_token。"
@@ -708,9 +718,13 @@ if ('$INSECURE_CURL' === 'true' || '$INSECURE_CURL') {
   let tokenExpiresIn = parseInt('$EXPIRES_IN') || 7200;
 
   // 1. 确定 OAUTH_URL
-  let oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
-  if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
-    oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
+  let oauthUrl = '$OAUTH_URL';
+  if (!oauthUrl) {
+    if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
+      oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
+    } else {
+      oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
+    }
   }
 
   // 2. 使用 Refresh Token 换取首任 Access Token 并自动发现可用模型

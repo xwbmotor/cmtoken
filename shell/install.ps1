@@ -21,6 +21,9 @@ param (
     [string]$ExchangeUrl = "",
     
     [Parameter(Mandatory=$false)]
+    [string]$OauthUrl = "",
+    
+    [Parameter(Mandatory=$false)]
     [string]$PackUrl = ""
 )
 
@@ -418,7 +421,7 @@ try {
   const r = JSON.parse('$responseStr');
   if (r.code === 200 || r.status === 'success') {
     const data = r.data || {};
-    console.log('SUCCESS|' + (data.device_token || '') + '|' + (data.pair_token || '') + '|' + (data.api_base || '') + '|' + (data.expires_in || '7200'));
+    console.log('SUCCESS|' + (data.device_token || '') + '|' + (data.pair_token || '') + '|' + (data.api_base || '') + '|' + (data.expires_in || '7200') + '|' + (data.oauth_url || data.oauth_base || ''));
   } else {
     console.log('ERROR|' + (r.msg || r.message || '未知错误'));
   }
@@ -445,6 +448,10 @@ if ([string]::IsNullOrEmpty($apiBase)) {
     $apiBase = $ExchangeUrl.Substring(0, $ExchangeUrl.IndexOf("/open/v1")) + "/open/v1"
 }
 $expiresIn = $parts[4]
+$oauthUrlFromExchange = $parts[5]
+if ([string]::IsNullOrEmpty($OauthUrl)) {
+    $OauthUrl = $oauthUrlFromExchange
+}
 log-success "🎉 令牌换券成功，已授权该实例！"
 
 # ── 7. 安装 CMToken 与 Tuken 插件 ───────────────────────────────────────────
@@ -515,9 +522,13 @@ if (!fs.existsSync(agentDir)) {
   let tokenExpiresIn = parseInt("$expiresIn") || 7200;
 
   // 1. 确定 OAUTH_URL
-  let oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
-  if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
-    oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
+  let oauthUrl = "$OauthUrl";
+  if (!oauthUrl) {
+    if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
+      oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
+    } else {
+      oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
+    }
   }
 
   // 2. 使用 Refresh Token 换取首任 Access Token 并自动发现可用模型
