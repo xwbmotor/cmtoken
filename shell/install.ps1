@@ -524,11 +524,7 @@ if (!fs.existsSync(agentDir)) {
   // 1. 确定 OAUTH_URL
   let oauthUrl = "$OauthUrl";
   if (!oauthUrl) {
-    if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
-      oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
-    } else {
-      oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
-    }
+    oauthUrl = "https://agentlink.idaas.cmpassport.com/oauth2-service";
   }
 
   // 2. 使用 Refresh Token 换取首任 Access Token 并自动发现可用模型
