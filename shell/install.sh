@@ -235,10 +235,10 @@ if [ -f "./$OFFLINE_FILE" ] || [ -f "./$GENERIC_FILE" ] || [ -f "$OFFLINE_FILE" 
     HAS_OFFLINE_PACKAGE=true
 fi
 
-if [ "$GLOBAL_OPENCLAW_OK" = true ] && [ "$HAS_OFFLINE_PACKAGE" = false ]; then
+if [ "$GLOBAL_OPENCLAW_OK" = true ]; then
     IS_PLUGIN_ONLY=true
-    log_success "检测到系统已具备全局/工作区 OpenClaw 服务，且本地无离线部署大包。"
-    log_info "🚀 将自动进入【极轻量级插件独立安装模式】！无需下载庞大的平台运行底座。"
+    log_success "检测到系统已具备全局/工作区 OpenClaw 服务。"
+    log_info "🚀 将自动进入【极轻量级插件独立安装模式】！直接通过现有的 openclaw 命令进行插件安全装载。"
 fi
 
 if [ "$IS_PLUGIN_ONLY" = true ]; then
