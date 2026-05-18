@@ -666,7 +666,13 @@ fi
     --oauth-url "$OAUTH_URL" \
     --insecure "$IS_INSECURE_FLAG"
 
-if [ $? -ne 0 ]; then
+# 保存执行状态码并在退出前清理临时激活脚本
+ACTIVATE_EXIT_CODE=$?
+if [ -f "$ACTIVATE_JS" ]; then
+    rm -f "$ACTIVATE_JS" 2>/dev/null || true
+fi
+
+if [ $ACTIVATE_EXIT_CODE -ne 0 ]; then
     log_error "自适应鉴权与自动配置失败！流程已中断。"
     exit 1
 fi

@@ -426,7 +426,14 @@ if ($isInsecure) {
     --oauth-url "$OauthUrl" `
     --insecure "$isInsecureFlag"
 
-if ($LASTEXITCODE -ne 0) {
+$activateExitCode = $LASTEXITCODE
+
+# 退出前清理临时激活脚本文件，确保无无用临时脚本留存
+if (Test-Path $activateJs) {
+    Remove-Item -Path $activateJs -Force | Out-Null
+}
+
+if ($activateExitCode -ne 0) {
     log-error "自适应鉴权与自动配置失败！流程已中断。"
     exit 1
 }
