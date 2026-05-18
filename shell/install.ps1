@@ -376,8 +376,42 @@ if (!(Test-Path $activateJs)) {
     }
 }
 
+# 智能网络下载兜底 (如果内嵌载荷缺失且本地没有，则尝试从网络动态下载)
 if (!(Test-Path $activateJs)) {
-    log-error "未能在安装包中定位到 activate.js 激活器脚本！"
+    log-info "未检测到本地或内嵌激活脚本，正在尝试从网络动态拉取..."
+    
+    $downloadPrefix = ""
+    if (![string]::IsNullOrEmpty($offlinePackUrl)) {
+        $downloadPrefix = $offlinePackUrl.TrimEnd('/') -replace 'openclaw.install.*.tgz', '' -replace 'openclaw.install.tgz', ''
+        $downloadPrefix = $downloadPrefix.TrimEnd('/')
+    } elseif (![string]::IsNullOrEmpty($deployExchangeUrl)) {
+        try {
+            $uri = New-Object System.Uri($deployExchangeUrl)
+            $downloadPrefix = $uri.GetLeftPart([System.UriPartial]::Authority)
+        } catch {}
+    }
+    
+    if (![string]::IsNullOrEmpty($downloadPrefix)) {
+        $downloadUrl = "$downloadPrefix/activate.js"
+        log-info "正在从 $downloadUrl 下载激活辅助脚本..."
+        try {
+            if ($isInsecure) {
+                # 忽略 SSL/TLS 校验
+                [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+            }
+            $webClient = New-Object System.Net.WebClient
+            $webClient.DownloadFile($downloadUrl, $activateJs)
+        } catch {
+            # 备用 Invoke-WebRequest 尝试下载
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $activateJs -UseBasicParsing -ErrorAction SilentlyContinue
+            } catch {}
+        }
+    }
+}
+
+if (!(Test-Path $activateJs)) {
+    log-error "未能在安装包中定位或拉取到 activate.js 激活器脚本！"
     exit 1
 }
 

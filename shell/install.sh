@@ -604,7 +604,7 @@ if [ -n "$ACTIVATE_JS_BASE64" ] && [ "$ACTIVATE_JS_BASE64" != "__ACTIVATE_JS_BAS
         NODE_EXEC="node"
     fi
     
-    # 使用 Node.js 本身来解码 Base64 字符串以保证绝对的跨平台一致性，不受系统 base64 工具链版本差异影响
+    # 使用 Node.js 本身来解码 Base64 字符串以保证绝对 of 跨平台一致性，不受系统 base64 工具链版本差异影响
     "$NODE_EXEC" -e "require('fs').writeFileSync('$ACTIVATE_JS', Buffer.from('$ACTIVATE_JS_BASE64', 'base64').toString('utf8'))" 2>/dev/null
 fi
 
@@ -617,8 +617,27 @@ if [ ! -f "$ACTIVATE_JS" ]; then
     fi
 fi
 
+# 智能网络下载兜底 (如果内嵌载荷缺失且本地没有，则尝试从网络动态下载)
 if [ ! -f "$ACTIVATE_JS" ]; then
-    log_error "未能在安装包中定位到 activate.js 激活器脚本！"
+    log_info "未检测到本地或内嵌激活脚本，正在尝试从网络动态拉取..."
+    
+    # 动态确定下载源前缀
+    DOWNLOAD_PREFIX=""
+    if [ -n "$OFFLINE_PACK_URL" ]; then
+        DOWNLOAD_PREFIX=$(echo "$OFFLINE_PACK_URL" | sed 's/\/$//' | sed 's/openclaw.install.*.tgz//g' | sed 's/openclaw.install.tgz//g' | sed 's/\/$//')
+    elif [ -n "$DEPLOY_EXCHANGE_URL" ]; then
+        # 从部署换券地址解析出 origin 作为前缀
+        DOWNLOAD_PREFIX=$(echo "$DEPLOY_EXCHANGE_URL" | awk -F/ '{print $1"//"$3}')
+    fi
+    
+    if [ -n "$DOWNLOAD_PREFIX" ]; then
+        log_info "正在从 ${DOWNLOAD_PREFIX}/activate.js 下载激活辅助脚本..."
+        curl ${INSECURE_CURL} -L -o "$ACTIVATE_JS" "${DOWNLOAD_PREFIX}/activate.js" 2>/dev/null
+    fi
+fi
+
+if [ ! -f "$ACTIVATE_JS" ]; then
+    log_error "未能在安装包中定位或拉取到 activate.js 激活器脚本！"
     exit 1
 fi
 
