@@ -617,27 +617,8 @@ if [ ! -f "$ACTIVATE_JS" ]; then
     fi
 fi
 
-# 智能网络下载兜底 (如果内嵌载荷缺失且本地没有，则尝试从网络动态下载)
 if [ ! -f "$ACTIVATE_JS" ]; then
-    log_info "未检测到本地或内嵌激活脚本，正在尝试从网络动态拉取..."
-    
-    # 动态确定下载源前缀
-    DOWNLOAD_PREFIX=""
-    if [ -n "$OFFLINE_PACK_URL" ]; then
-        DOWNLOAD_PREFIX=$(echo "$OFFLINE_PACK_URL" | sed 's/\/$//' | sed 's/openclaw.install.*.tgz//g' | sed 's/openclaw.install.tgz//g' | sed 's/\/$//')
-    elif [ -n "$DEPLOY_EXCHANGE_URL" ]; then
-        # 从部署换券地址解析出 origin 作为前缀
-        DOWNLOAD_PREFIX=$(echo "$DEPLOY_EXCHANGE_URL" | awk -F/ '{print $1"//"$3}')
-    fi
-    
-    if [ -n "$DOWNLOAD_PREFIX" ]; then
-        log_info "正在从 ${DOWNLOAD_PREFIX}/activate.js 下载激活辅助脚本..."
-        curl ${INSECURE_CURL} -L -o "$ACTIVATE_JS" "${DOWNLOAD_PREFIX}/activate.js" 2>/dev/null
-    fi
-fi
-
-if [ ! -f "$ACTIVATE_JS" ]; then
-    log_error "未能在安装包中定位或拉取到 activate.js 激活器脚本！"
+    log_error "未能在安装包中定位到 activate.js 激活器脚本！"
     exit 1
 fi
 
