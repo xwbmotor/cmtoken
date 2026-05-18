@@ -719,14 +719,20 @@ if ('$INSECURE_CURL' === 'true' || '$INSECURE_CURL') {
 
   // 1. 确定 OAUTH_URL
   let oauthUrl = '$OAUTH_URL';
+  if (!oauthUrl) {
+    if (exchangeUrl.includes('nat300') || exchangeUrl.includes('test')) {
+      oauthUrl = 'https://testcert.cmpassport.com:7002/oauth2-service';
+    } else {
+      oauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
+    }
+  }
 
   // 2. 使用 Refresh Token 换取首任 Access Token 并自动发现可用模型
-  if (oauthUrl) {
-    try {
-      const tokenUrl = oauthUrl + '/oauth/device/token';
-      const discoveryUrl = apiBase + '/models';
+  try {
+    const tokenUrl = oauthUrl + '/oauth/device/token';
+    const discoveryUrl = apiBase + '/models';
 
-      const tokenParams = new URLSearchParams();
+    const tokenParams = new URLSearchParams();
     tokenParams.append('grant_type', 'refresh_token');
     tokenParams.append('client_id', hostId);
     tokenParams.append('client_secret', pairToken);
@@ -785,9 +791,6 @@ if ('$INSECURE_CURL' === 'true' || '$INSECURE_CURL') {
   } catch (err) {
     console.warn('⚠️ 自适应拉取中移模型列表异常，将回退至内置默认配置。错误:', err.message);
   }
-} else {
-  console.log('📡 未配置 OAUTH_URL，跳过自适应模型发现，采用缺省配置。');
-}
 
   // 1. 更新 openclaw.json
   const openclawJsonPath = path.join(homeDir, '.openclaw', 'openclaw.json');
