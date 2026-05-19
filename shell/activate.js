@@ -34,6 +34,7 @@ const hostId = args['host-id'];
 const tempToken = args['temp-token'];
 const exchangeUrl = 'http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/deploy/exchange';
 const customOauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
+const apiBase = 'http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1';
 const isInsecure = args['insecure'] === 'true' || args['insecure'] === true;
 
 if (!hostId || !tempToken) {
@@ -84,7 +85,6 @@ if (isInsecure) {
   const data = exchangeData.data || {};
   const deviceToken = data.device_token;
   const pairToken = data.pair_token;
-  const apiBase = data.api_base || (exchangeUrl.substring(0, exchangeUrl.indexOf('/open/v1')) + '/open/v1');
   const tokenExpiresIn = parseInt(data.expires_in) || 7200;
   const serverOauthUrl = data.oauth_url || data.oauth_base || '';
 
@@ -252,7 +252,7 @@ if (isInsecure) {
     hubBaseUrl = u.origin + u.pathname.substring(0, u.pathname.lastIndexOf('/deploy/exchange'));
   } catch (e) {}
 
-  openclawJson.plugins.entries['tuken'].config.baseUrl = hubBaseUrl || (exchangeUrl.substring(0, exchangeUrl.indexOf('/open/v1')) + '/open/v1');
+  openclawJson.plugins.entries['tuken'].config.baseUrl = hubBaseUrl || apiBase;
   openclawJson.plugins.entries['tuken'].config.appId = hostId;
   openclawJson.plugins.entries['tuken'].config.appSecret = pairToken;
   openclawJson.plugins.entries['tuken'].config.instanceId = hostId;
