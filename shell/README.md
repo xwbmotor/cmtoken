@@ -23,14 +23,13 @@ shell/
 
 ## ⚙️ 核心配置参数说明
 
-为了保证脚本的中立性、纯净度与安全性，**脚本内不包含任何默认的主机域名或下载源地址**。在执行在线部署或激活换券时，系统需要您指定以下两个关键服务配置：
+为了确保极致的开箱即用与极简运维体验，系统已将中移 MaaS 的生产服务地址固化硬编码为默认值，用户无需进行任何复杂的 API 域名配置：
 
 ### 1. 参数定义与平台识别机制
 
-* **🤖 兔啃部署换券接口地址 (`--exchange-url` / `-ExchangeUrl`)**
-  * **作用**：向您中移认证中心的接口提交 `temp_token` 和宿主 Host ID，用以立即销毁 Temp Token 并换回 `device_token`（OAuth 刷新令牌）和 `pair_token`（渠道配对令牌）。
-  * **默认值**：空（在线激活时为 **必填项**）。
-  * **免配置绑定机制**：激活配对成功后，该地址会自动作为前缀（去除 `/open/v1` 等接口后缀）写入 Tuken 渠道的 `baseUrl` 中，实现整套系统零人工干预的端到端连通！
+* **🔑 动态激活临时密钥 (`--bot-token` / `-BotToken`)**
+  * **作用**：中移认证中心分发的临时部署令牌（Temp Token）。用于和宿主 Host ID 进行安全换券校验。
+  * **属性**：**必填项**。
 
 * **📦 离线安装大包下载源前缀 (`--pack-url` / `-PackUrl`)**
   * **作用**：在线下载模式下，如果您本地同级目录没有放置离线大包，脚本会向此地址发起网络下载请求。
@@ -50,13 +49,13 @@ shell/
 
 * **🐧 Linux / macOS**：
   ```bash
-  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --exchange-url <YOUR_EXCHANGE_URL>
+  bash install.sh --bot-token <YOUR_TEMP_TOKEN>
   ```
   *脚本检测到同级离线包后会自动进入纯本地解压模式，跳过网络下载，10 秒内即可完成绿色环境部署与令牌授权！*
 
 * **💻 Windows (双击或 CMD 命令行)**：
   ```cmd
-  install.bat --bot-token <YOUR_TEMP_TOKEN> --exchange-url <YOUR_EXCHANGE_URL>
+  install.bat --bot-token <YOUR_TEMP_TOKEN>
   ```
 
 ---
@@ -67,18 +66,18 @@ shell/
 
 * **🐧 Linux / macOS**：
   ```bash
-  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --exchange-url <EXCHANGE_URL> --pack-url <URL_PREFIX>
+  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --pack-url <URL_PREFIX>
   ```
   *示例：`--pack-url "http://intranet.local/packages"` 运行在 Mac 上时，脚本会自动请求 `http://intranet.local/packages/openclaw.install.mac.tgz`！*
 
 * **💻 Windows (使用 install.bat)**：
   ```cmd
-  install.bat --bot-token <YOUR_TEMP_TOKEN> --exchange-url <EXCHANGE_URL> --pack-url <URL_PREFIX>
+  install.bat --bot-token <YOUR_TEMP_TOKEN> --pack-url <URL_PREFIX>
   ```
 
 * **💻 Windows (原生 PowerShell)**：
   ```powershell
-  .\install.ps1 -BotToken <YOUR_TEMP_TOKEN> -ExchangeUrl <EXCHANGE_URL> -PackUrl <URL_PREFIX>
+  .\install.ps1 -BotToken <YOUR_TEMP_TOKEN> -PackUrl <URL_PREFIX>
   ```
 
 ---
@@ -91,24 +90,24 @@ shell/
 如果您本地已经有编译好的 CMToken 和 Tuken 插件 `.tgz` 包（可以从 `shell/releases/` 复制，或者通过 `pnpm run pack` 编译）：
 * **🐧 Linux / macOS**：
   ```bash
-  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --exchange-url <YOUR_EXCHANGE_URL>
+  bash install.sh --bot-token <YOUR_TEMP_TOKEN>
   ```
   *(脚本会自动寻找并优先安装本地 `cmtoken-v1.0.0-prod.tgz` 与 `tuken-v0.6.0.tgz` 两个插件！整个过程只需不到 1 秒且无需网络)*
 
 * **💻 Windows (使用 install.bat)**：
   ```cmd
-  install.bat --bot-token <YOUR_TEMP_TOKEN> --exchange-url <YOUR_EXCHANGE_URL>
+  install.bat --bot-token <YOUR_TEMP_TOKEN>
   ```
 
 #### 2. 在线极简轻量下载
 如果本地没有插件包，您只需要指定下载源前缀，脚本会**只下载这两个轻量级插件文件**（文件大小仅几百 KB 级别），而完全不下载底座：
 * **🐧 Linux / macOS**：
   ```bash
-  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --exchange-url <EXCHANGE_URL> --pack-url <URL_PREFIX>
+  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --pack-url <URL_PREFIX>
   ```
 * **💻 Windows (使用 install.bat)**：
   ```cmd
-  install.bat --bot-token <YOUR_TEMP_TOKEN> --exchange-url <EXCHANGE_URL> --pack-url <URL_PREFIX>
+  install.bat --bot-token <YOUR_TEMP_TOKEN> --pack-url <URL_PREFIX>
   ```
 
 ---
