@@ -18,10 +18,10 @@ param (
     [string]$InstallDir = "$Home\.openclaw-app",
     
     [Parameter(Mandatory=$false)]
-    [string]$ExchangeUrl = "",
+    [string]$ExchangeUrl = "http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/deploy/exchange",
     
     [Parameter(Mandatory=$false)]
-    [string]$OauthUrl = "",
+    [string]$OauthUrl = "https://agentlink.idaas.cmpassport.com/oauth2-service",
     
     [Parameter(Mandatory=$false)]
     [string]$PackUrl = ""
@@ -32,14 +32,6 @@ function log-info($msg) { Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 function log-success($msg) { Write-Host "[SUCCESS] $msg" -ForegroundColor Green }
 function log-warning($msg) { Write-Host "[WARNING] $msg" -ForegroundColor Yellow }
 function log-error($msg) { Write-Host "[ERROR] $msg" -ForegroundColor Red }
-
-# ── 1. 参数合理性校验 ────────────────────────────────────────────────────────
-if ([string]::IsNullOrEmpty($ExchangeUrl)) {
-    log-error "缺少必需参数 -ExchangeUrl (部署换券接口地址)！"
-    log-error "在线部署或激活配对时，请指定您中移认证中心的部署换券接口地址。"
-    log-error "使用示例: .\install.ps1 -BotToken <YOUR_TOKEN> -ExchangeUrl <EXCHANGE_URL>"
-    exit 1
-}
 
 # ── 1.5 HTTPS/SSL 证书校验自检 ────────────────────────────────────────────────
 log-info "正在进行 HTTPS 证书链路与网络连通性自检..."
@@ -432,7 +424,7 @@ if ($isCmtokenInstalled) {
 
 # 执行 Tuken 渠道插件安装
 if ($isTukenInstalled) {
-    log-info "检测到 Tuken / clawbot-hub 渠道插件已安装，跳过重新安装。"
+    log-info "检测到 Tuken 渠道插件已安装，跳过重新安装。"
 } else {
     log-info "正在安装 Tuken 渠道插件: $resolvedTukenTgz"
     if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
@@ -453,8 +445,6 @@ if ($isInsecure) {
 & "$nodePath" "$activateJs" `
     --host-id "$hostId" `
     --temp-token "$BotToken" `
-    --exchange-url "$ExchangeUrl" `
-    --oauth-url "$OauthUrl" `
     --insecure "$isInsecureFlag"
 
 $activateExitCode = $LASTEXITCODE

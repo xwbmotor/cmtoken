@@ -32,12 +32,12 @@ for (let i = 2; i < process.argv.length; i++) {
 
 const hostId = args['host-id'];
 const tempToken = args['temp-token'];
-const exchangeUrl = args['exchange-url'];
-const customOauthUrl = args['oauth-url'];
+const exchangeUrl = 'http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/deploy/exchange';
+const customOauthUrl = 'https://agentlink.idaas.cmpassport.com/oauth2-service';
 const isInsecure = args['insecure'] === 'true' || args['insecure'] === true;
 
-if (!hostId || !tempToken || !exchangeUrl) {
-  console.error('❌ 激活失败：缺少必需参数 (--host-id, --temp-token, --exchange-url)');
+if (!hostId || !tempToken) {
+  console.error('❌ 激活失败：缺少必需参数 (--host-id, --temp-token)');
   process.exit(1);
 }
 

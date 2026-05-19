@@ -56,7 +56,8 @@ log_error() {
 TEMP_TOKEN=""
 INSTALL_DIR="$HOME/.openclaw-app"
 INSECURE_CURL=""
-OAUTH_URL=""
+DEPLOY_EXCHANGE_URL="http://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/deploy/exchange"
+OAUTH_URL="https://agentlink.idaas.cmpassport.com/oauth2-service"
 
 while [ "$#" -gt 0 ]; do
     case $1 in
@@ -66,14 +67,6 @@ while [ "$#" -gt 0 ]; do
             ;;
         --install-dir)
             INSTALL_DIR="$2"
-            shift 2
-            ;;
-        --exchange-url)
-            DEPLOY_EXCHANGE_URL="$2"
-            shift 2
-            ;;
-        --oauth-url)
-            OAUTH_URL="$2"
             shift 2
             ;;
         --pack-url)
@@ -95,14 +88,7 @@ done
 if [ -z "$TEMP_TOKEN" ]; then
     log_error "缺少必需参数 --bot-token (temp_token)"
     echo "使用示例:"
-    echo "  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --exchange-url <EXCHANGE_URL>"
-    exit 1
-fi
-
-if [ -z "$DEPLOY_EXCHANGE_URL" ]; then
-    log_error "缺少必需参数 --exchange-url (部署换券接口地址)"
-    echo "使用示例:"
-    echo "  bash install.sh --bot-token <YOUR_TEMP_TOKEN> --exchange-url <EXCHANGE_URL>"
+    echo "  bash install.sh --bot-token <YOUR_TEMP_TOKEN>"
     exit 1
 fi
 
@@ -648,7 +634,7 @@ fi
 
 # 检查 Tuken / clawbot-hub
 if echo "$INSTALLED_PLUGINS" | grep -E -q "tuken|clawbot-hub"; then
-    log_info "检测到 Tuken / clawbot-hub 渠道插件已安装，跳过重新安装。"
+    log_info "检测到 Tuken 渠道插件已安装，跳过重新安装。"
 else
     if [ -n "$TUKEN_TGZ" ] && [ -f "$TUKEN_TGZ" ]; then
         log_info "正在安装 Tuken 渠道插件: $TUKEN_TGZ"
@@ -675,8 +661,6 @@ fi
 "$NODE_EXEC" "$ACTIVATE_JS" \
     --host-id "$HOST_ID" \
     --temp-token "$TEMP_TOKEN" \
-    --exchange-url "$DEPLOY_EXCHANGE_URL" \
-    --oauth-url "$OAUTH_URL" \
     --insecure "$IS_INSECURE_FLAG"
 
 # 保存执行状态码并在退出前清理临时激活脚本
