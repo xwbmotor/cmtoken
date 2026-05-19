@@ -391,24 +391,55 @@ if ($isPluginOnly) {
     $cmtokenTgz = Get-ChildItem -Path $stagingDir -Filter "*cmtoken*.tgz" | Select-Object -First 1
     $tukenTgz = Get-ChildItem -Path $stagingDir -Filter "*tuken*.tgz" | Select-Object -First 1
     if (!$cmtokenTgz -or !$tukenTgz) {
-        log-error "未在解压 of 离线包中找到插件安装包！"
+        log-error "未在解压的离线包中找到插件安装包！"
         exit 1
     }
     $resolvedCmtokenTgz = $cmtokenTgz.FullName
     $resolvedTukenTgz = $tukenTgz.FullName
 }
 
-# 执行插件安装
-if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
-    & openclaw plugins install $resolvedCmtokenTgz --dangerously-force-unsafe-install
-} else {
-    & "$nodePath" $cliPath plugins install $resolvedCmtokenTgz --dangerously-force-unsafe-install
+# 获取已安装的插件列表
+$installedPlugins = ""
+try {
+    if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
+        $installedPlugins = & openclaw plugins list 2>$null
+    } else {
+        $installedPlugins = & "$nodePath" $cliPath plugins list 2>$null
+    }
+} catch {}
+
+$isCmtokenInstalled = $false
+if ($installedPlugins -like "*cmtoken*") {
+    $isCmtokenInstalled = $true
 }
 
-if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
-    & openclaw plugins install $resolvedTukenTgz --dangerously-force-unsafe-install
+$isTukenInstalled = $false
+if ($installedPlugins -like "*tuken*" -or $installedPlugins -like "*clawbot-hub*") {
+    $isTukenInstalled = $true
+}
+
+# 执行 CMToken 插件安装
+if ($isCmtokenInstalled) {
+    log-info "检测到 CMToken 插件已安装，跳过重新安装。"
 } else {
-    & "$nodePath" $cliPath plugins install $resolvedTukenTgz --dangerously-force-unsafe-install
+    log-info "正在安装 CMToken 插件: $resolvedCmtokenTgz"
+    if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
+        & openclaw plugins install $resolvedCmtokenTgz --dangerously-force-unsafe-install
+    } else {
+        & "$nodePath" $cliPath plugins install $resolvedCmtokenTgz --dangerously-force-unsafe-install
+    }
+}
+
+# 执行 Tuken 渠道插件安装
+if ($isTukenInstalled) {
+    log-info "检测到 Tuken / clawbot-hub 渠道插件已安装，跳过重新安装。"
+} else {
+    log-info "正在安装 Tuken 渠道插件: $resolvedTukenTgz"
+    if ($isPluginOnly -and (Get-Command "openclaw" -ErrorAction SilentlyContinue)) {
+        & openclaw plugins install $resolvedTukenTgz --dangerously-force-unsafe-install
+    } else {
+        & "$nodePath" $cliPath plugins install $resolvedTukenTgz --dangerously-force-unsafe-install
+    }
 }
 
 # ── 8. 模型与渠道自动配对 ─────────────────────────────────────────────────────

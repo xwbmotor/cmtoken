@@ -630,20 +630,33 @@ if [ "$IS_PLUGIN_ONLY" = false ]; then
     TUKEN_TGZ=$(find "$STAGING_DIR" -name "*tuken*.tgz" | head -n 1)
 fi
 
-if [ -n "$CMTOKEN_TGZ" ] && [ -f "$CMTOKEN_TGZ" ]; then
-    log_info "正在安装 CMToken 插件: $CMTOKEN_TGZ"
-    $OPENCLAW_PATH plugins install "$CMTOKEN_TGZ" --dangerously-force-unsafe-install
+# 获取已安装插件的列表
+INSTALLED_PLUGINS=$($OPENCLAW_PATH plugins list 2>/dev/null)
+
+# 检查 CMToken
+if echo "$INSTALLED_PLUGINS" | grep -q "cmtoken"; then
+    log_info "检测到 CMToken 插件已安装，跳过重新安装。"
 else
-    log_error "未找到 CMToken 插件安装包，安装流程中断！"
-    exit 1
+    if [ -n "$CMTOKEN_TGZ" ] && [ -f "$CMTOKEN_TGZ" ]; then
+        log_info "正在安装 CMToken 插件: $CMTOKEN_TGZ"
+        $OPENCLAW_PATH plugins install "$CMTOKEN_TGZ" --dangerously-force-unsafe-install
+    else
+        log_error "未找到 CMToken 插件安装包，安装流程中断！"
+        exit 1
+    fi
 fi
 
-if [ -n "$TUKEN_TGZ" ] && [ -f "$TUKEN_TGZ" ]; then
-    log_info "正在安装 Tuken 渠道插件: $TUKEN_TGZ"
-    $OPENCLAW_PATH plugins install "$TUKEN_TGZ" --dangerously-force-unsafe-install
+# 检查 Tuken / clawbot-hub
+if echo "$INSTALLED_PLUGINS" | grep -E -q "tuken|clawbot-hub"; then
+    log_info "检测到 Tuken / clawbot-hub 渠道插件已安装，跳过重新安装。"
 else
-    log_error "未找到 Tuken 渠道插件安装包，安装流程中断！"
-    exit 1
+    if [ -n "$TUKEN_TGZ" ] && [ -f "$TUKEN_TGZ" ]; then
+        log_info "正在安装 Tuken 渠道插件: $TUKEN_TGZ"
+        $OPENCLAW_PATH plugins install "$TUKEN_TGZ" --dangerously-force-unsafe-install
+    else
+        log_error "未找到 Tuken 渠道插件安装包，安装流程中断！"
+        exit 1
+    fi
 fi
 
 # ── 8. 走 CMToken 模型自动配置和渠道自动配对流程 ──────────────────────────────
