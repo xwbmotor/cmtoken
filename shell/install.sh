@@ -694,15 +694,23 @@ echo ""
 SERVICE_REGISTERED=false
 log_info "正在为您全自动配置并拉起持久化后台守护服务..."
 
-if [ "$(id -u)" -eq 0 ]; then
-    log_info "正在以 root 身份注册系统守护服务..."
+if [ "$OS_TYPE" = "Darwin" ]; then
+    log_info "检测到 macOS 系统，正在为您注册用户级 LaunchAgent 守护服务 (免 Root)..."
     if $OPENCLAW_PATH daemon install --force >/dev/null 2>&1 && $OPENCLAW_PATH daemon start >/dev/null 2>&1; then
         SERVICE_REGISTERED=true
     fi
-elif command -v sudo >/dev/null 2>&1; then
-    log_info "检测到非 root 用户，正在使用 sudo 提权注册系统守护服务 (可能需要您输入密码)..."
-    if sudo $OPENCLAW_PATH daemon install --force >/dev/null 2>&1 && sudo $OPENCLAW_PATH daemon start >/dev/null 2>&1; then
-        SERVICE_REGISTERED=true
+else
+    # Linux / 其他 Unix 系统：系统守护服务安装（systemd 需 Root 特权）
+    if [ "$(id -u)" -eq 0 ]; then
+        log_info "正在以 root 身份注册系统守护服务..."
+        if $OPENCLAW_PATH daemon install --force >/dev/null 2>&1 && $OPENCLAW_PATH daemon start >/dev/null 2>&1; then
+            SERVICE_REGISTERED=true
+        fi
+    elif command -v sudo >/dev/null 2>&1; then
+        log_info "检测到非 root 用户，正在使用 sudo 提权注册系统守护服务 (可能需要您输入密码)..."
+        if sudo $OPENCLAW_PATH daemon install --force >/dev/null 2>&1 && sudo $OPENCLAW_PATH daemon start >/dev/null 2>&1; then
+            SERVICE_REGISTERED=true
+        fi
     fi
 fi
 
