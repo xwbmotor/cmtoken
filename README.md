@@ -16,7 +16,7 @@ This is a model provider plugin for OpenClaw that supports CMToken authenticatio
 1.  **Extract**: Copy this folder to your desired location.
 2.  **Dependencies**:
     ```bash
-    npm install
+    pnpm install
     ```
 
 ## Environment Configuration
@@ -50,10 +50,10 @@ Used for local development and testing.
 
 ```bash
 # Build only
-npm run build
+pnpm run build
 
 # Build & Package (generates cmtoken.tgz)
-npm run pack
+pnpm run pack
 ```
 
 ### 🚀 Production Environment
@@ -98,5 +98,5 @@ openclaw configure
 
 ## Build Scripts
 
-- `npm run build`: Bundles the plugin into `dist/index.js`.
-- `npm run pack`: Bundles and packages the plugin into `cmtoken.tgz`.
+- `pnpm run build`: Bundles the plugin into `dist/index.js`.
+- `pnpm run pack`: Bundles and packages the plugin into `cmtoken.tgz`.
