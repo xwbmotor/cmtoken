@@ -189,72 +189,15 @@ async function pollOAuthToken(params: {
   };
 }
 
-function renderQrAscii(data: string): Promise<string> {
+function renderQrAscii(data: string, isSmall: boolean = true): Promise<string> {
   return new Promise((resolve) => {
-    qrcode.generate(data, { small: true }, (output: string) => {
+    qrcode.generate(data, { small: isSmall }, (output: string) => {
       resolve(output);
     });
   });
 }
 
-function generateQrHtmlFile(verificationUrl: string, oauthCode: string): Promise<string> {
-  return new Promise((resolve) => {
-    qrcode.generate(verificationUrl, { small: false }, (output: string) => {
-      let html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>CMToken 扫码授权</title>
-  <style>
-    body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    .card { padding: 40px; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); text-align: center; }
-    h2 { color: #333; margin-top: 0; margin-bottom: 24px; }
-    .qr-container { display: inline-block; padding: 10px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 24px; }
-    .qr-row { display: flex; height: 8px; }
-    .qr-cell { width: 8px; height: 8px; }
-    .w { background-color: white; }
-    .b { background-color: black; }
-    .code { font-size: 24px; font-weight: bold; color: #1677ff; letter-spacing: 2px; }
-    p { color: #666; margin: 10px 0; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h2>请使用手机扫码授权</h2>
-    <div class="qr-container">`;
 
-      const lines = output.split('\n');
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        let rowHtml = '<div class="qr-row">';
-        const regex = new RegExp("\\x1B\\[(47|40)m {2}\\x1B\\[0m", "g");
-        let match;
-        let hasCells = false;
-        while ((match = regex.exec(line)) !== null) {
-          const isWhite = match[1] === '47';
-          rowHtml += `<div class="qr-cell ${isWhite ? 'w' : 'b'}"></div>`;
-          hasCells = true;
-        }
-        rowHtml += '</div>';
-        if (hasCells) {
-          html += rowHtml;
-        }
-      }
-
-      html += `</div>
-    <p>验证代码</p>
-    <div class="code">${oauthCode}</div>
-    <p style="font-size: 13px; margin-top: 24px; color: #999;">如果无法扫码，请<a href="${verificationUrl}" target="_blank">点击此处直接授权</a></p>
-  </div>
-</body>
-</html>`;
-
-      const tmpPath = path.join(os.tmpdir(), `cmtoken-auth-${Date.now()}.html`);
-      fs.writeFileSync(tmpPath, html, 'utf8');
-      resolve(tmpPath);
-    });
-  });
-}
 
 async function detectModernTerminal(): Promise<{ isModern: boolean; debugInfo: string }> {
   // 不在 TTY 环境里（如被管道重定向），直接认为不支持
@@ -350,56 +293,22 @@ export async function loginCMTokenOAuth(params: {
 
   // 通过发送 ANSI 设备查询码探测是否为现代终端
   let isModernTerminal = true;
-  let termDebugInfo = "non-windows";
-  
   if (isWindows) {
     const detection = await detectModernTerminal();
     isModernTerminal = detection.isModern;
-    termDebugInfo = detection.debugInfo;
   }
   
-  // 如果是老式终端，才弹出网页二维码作为补偿
-  const shouldPopupHtml = isWindows && !isModernTerminal;
-
-  let browserTargetUrl = verificationUrl;
-
-  if (shouldPopupHtml) {
-    try {
-      browserTargetUrl = await generateQrHtmlFile(verificationUrl, oauth.user_code);
-    } catch (e) {
-      // fallback
-    }
-  }
-
-  const qrAscii = await renderQrAscii(verificationUrl);
+  // 对于老式终端，关闭 small 模式（使用全方块字符），虽然图案较大，但能完美兼容旧版 conhost 字体
+  const qrAscii = await renderQrAscii(verificationUrl, isModernTerminal);
 
   const noteLines = [
     `验证地址: ${verificationUrl}`,
     `用户代码: ${oauth.user_code}`,
-    shouldPopupHtml 
-      ? `👉 若终端二维码由于字体原因显示异常，请扫描自动弹出的网页版二维码。(若浏览器未弹出，请手动复制上方地址)` 
-      : `请扫描上方二维码，或复制链接在浏览器中授权。`,
+    `请扫描上方二维码，或复制链接在浏览器中授权。`,
   ];
 
   log(qrAscii);
   await params.note(noteLines.join("\n"), "CMToken OAuth 登录");
-
-  if (shouldPopupHtml) {
-    params.progress.update("正在尝试打开浏览器...");
-    try {
-    if (isWindows && browserTargetUrl.endsWith(".html")) {
-      // 必须使用 Base64 动态解码 require 模块名来彻底绕过 OpenClaw 安装器的危险代码文本扫描！
-      // esbuild 之前把 "child" + "_process" 优化合并成了 "child_process"，导致安装被拦截。
-      const cpName = Buffer.from("Y2hpbGRfcHJvY2Vzcw==", "base64").toString();
-      const cp = require(cpName);
-      cp.exec(`start "" "${browserTargetUrl}"`);
-    } else {
-      await params.openUrl(browserTargetUrl);
-    }
-  } catch (err) {
-    error(`自动弹出浏览器失败，请手动打开验证地址`);
-  }
-  }
 
   // 暂停加载动画，防止不断刷新的输出导致终端一直自动滚动到底部
   params.progress.stop("等待扫码授权中...（可自由向上滚动查看二维码）");
