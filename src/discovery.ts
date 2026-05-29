@@ -54,8 +54,8 @@ export async function fetchCMTokenModels(
         throw new CMTokenSubscriptionError(errorText);
       }
 
-      if (response.status !== 401) {
-        console.error(`[CMToken] Fetch models failed (${response.status}): ${errorText}`);
+      if (response.status !== 401 && response.status !== 400) {
+        console.error(`[CMToken] Fetch models failed (${response.status}): ${errorText.slice(0, 200)}`);
       }
       throw new CMTokenDiscoveryError(errorText, response.status);
     }
@@ -82,8 +82,8 @@ export async function fetchCMTokenModels(
     if (err instanceof CMTokenSubscriptionError) {
       throw err;
     }
-    if (!(err instanceof CMTokenDiscoveryError && err.status === 401) && !(err.message && (err.message.includes("100401") || err.message.includes("用户未登录")))) {
-      console.error(`[CMToken] Fetch models error: ${err.message || err}`);
+    if (!(err instanceof CMTokenDiscoveryError && (err.status === 401 || err.status === 400)) && !(err.message && (err.message.includes("100401") || err.message.includes("用户未登录")))) {
+      console.error(`[CMToken] Fetch models error: ${String(err.message || err).slice(0, 200)}`);
     }
     return STATIC_MODELS;
   }

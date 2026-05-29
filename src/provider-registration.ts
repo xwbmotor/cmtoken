@@ -46,20 +46,59 @@ async function resolveApiCatalog(ctx: ProviderCatalogContext) {
     trace("Exiting resolveApiCatalog (Cache hit)", start);
     return discoveryCache.data;
   }
+
+  // FAST PATH: Use models already saved in config (from OAuth/API Key setup) to avoid slow duplicate fetch on startup
+  if (config.models && Array.isArray(config.models) && config.models.length > 0) {
+    const result = { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: config.models } };
+    discoveryCache = { data: result, timestamp: Date.now() };
+    trace("Exiting resolveApiCatalog (Fast path via config.models)", start);
+    
+    // 异步在后台静默更新，不阻塞当前流程
+    // 这样既能保证启动瞬间秒开，又能保证长时间运行后模型列表是最新的
+    setTimeout(async () => {
+       try {
+         const { fetchCMTokenModels } = await import("./discovery.js");
+         const auth = ctx.resolveProviderAuth(PROVIDER_ID);
+         const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
+         const effectiveToken = auth.access?.trim() || token;
+         if (effectiveToken && effectiveToken.length > 15) {
+           const rawModels = await fetchCMTokenModels(config.discoveryUrl || DEFAULT_DISCOVERY_URL, 15000, effectiveToken);
+           if (rawModels && rawModels.length > 0) {
+              const freshModels = rawModels.map((m: any) => ({
+                id: m.id, name: m.name || m.id, reasoning: false, input: ["text" as const],
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: m.contextWindow || 192000, maxTokens: m.maxTokens || 8192,
+              }));
+              discoveryCache = { data: { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: freshModels } }, timestamp: Date.now() };
+           }
+         }
+       } catch (e) { /* ignore background fetch errors */ }
+    }, 1000);
+
+    return result;
+  }
+
   const discoveryUrl = config.discoveryUrl || DEFAULT_DISCOVERY_URL;
   let finalModels: any[] = [];
   try {
     const { fetchCMTokenModels, CMTokenSubscriptionError, CMTokenDiscoveryError } = await import("./discovery.js");
     const auth = ctx.resolveProviderAuth(PROVIDER_ID);
     const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
+    const oauthAccess = auth.access?.trim();
+    const effectiveToken = oauthAccess || token;
     
-    // Skip discovery if we don't have a valid-looking token yet (avoids noisy 401s during setup)
-    if (!token || token.length < 16 || token === "undefined" || token === "null") {
+    if (!effectiveToken || effectiveToken.length < 16 || effectiveToken === "undefined" || effectiveToken === "null" || effectiveToken === "initial_activation_token") {
        trace("Skipping CMToken discovery: No valid token available yet.");
        return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
     }
 
-    const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, token);
+    const oauthExpires = auth.expires as number | undefined;
+    if (oauthExpires && Date.now() > oauthExpires) {
+       trace("Skipping CMToken discovery: OAuth token expired, awaiting refresh.");
+       return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
+    }
+
+    const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, effectiveToken);
     if (rawModels && rawModels.length > 0) {
       finalModels = rawModels.map((m: any) => ({
         id: m.id,
