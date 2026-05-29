@@ -10,3 +10,5 @@ environments.json
 releases/
 doc/
 shell/releases/
+channel/
+shell/
