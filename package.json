@@ -1,7 +1,6 @@
 {
   "name": "cmtoken",
-  "version": "1.0.0",
-
+  "version": "1.0.1",
   "description": "OpenClaw CMToken provider plugin with OAuth support",
   "type": "module",
   "scripts": {
