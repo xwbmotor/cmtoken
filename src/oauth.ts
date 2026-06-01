@@ -1,11 +1,6 @@
-import { generatePkceVerifierChallenge, toFormUrlEncoded } from "openclaw/plugin-sdk/provider-auth";
-import { URL, pathToFileURL } from "node:url";
-
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, createHash } from "node:crypto";
 import * as tty from "node:tty";
 import * as os from "node:os";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import qrcode from "qrcode-terminal";
 
 const OAUTH_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes for polling requests
@@ -64,8 +59,19 @@ type TokenResult =
   | TokenPending
   | { status: "error"; message: string };
 
+interface TokenResponsePayload {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  resource_url?: string;
+  notification_message?: string;
+  error?: string;
+  error_description?: string;
+}
+
 function generatePkce(): { verifier: string; challenge: string; state: string } {
-  const { verifier, challenge } = generatePkceVerifierChallenge();
+  const verifier = randomBytes(32).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
   const state = randomBytes(16).toString("base64url");
   return { verifier, challenge, state };
 }
@@ -90,7 +96,7 @@ async function requestDeviceCode(params: {
         Accept: "application/json",
         "x-request-id": randomUUID(),
       },
-      body: toFormUrlEncoded({
+      body: new URLSearchParams({
         response_type: "device_code",
         client_id: endpoints.clientId,
         scope: CMTOKEN_OAUTH_SCOPE,
@@ -135,7 +141,7 @@ async function pollOAuthToken(params: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
       },
-      body: toFormUrlEncoded({
+      body: new URLSearchParams({
         grant_type: CMTOKEN_OAUTH_GRANT_TYPE,
         client_id: endpoints.clientId,
         device_code: params.deviceCode,
@@ -357,7 +363,7 @@ export async function refreshCMTokenToken(params: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
-    body: toFormUrlEncoded({
+    body: new URLSearchParams({
       grant_type: "refresh_token",
       client_id: endpoints.clientId,
       refresh_token: params.refreshToken,

@@ -1,6 +1,3 @@
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import type {
   OpenClawPluginApi,
@@ -10,7 +7,6 @@ import type {
 } from "openclaw/plugin-sdk/plugin-entry";
 import {
   buildOauthProviderAuthResult,
-  createProviderApiKeyAuthMethod,
 } from "openclaw/plugin-sdk/provider-auth";
 
 import { CMTOKEN_DEFAULT_MODEL_ID } from "./provider-models.js";
@@ -60,7 +56,7 @@ async function resolveApiCatalog(ctx: ProviderCatalogContext) {
          const { fetchCMTokenModels } = await import("./discovery.js");
          const auth = ctx.resolveProviderAuth(PROVIDER_ID);
          const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
-         const effectiveToken = auth.access?.trim() || token;
+         const effectiveToken = (auth as any).access?.trim() || token;
          if (effectiveToken && effectiveToken.length > 15) {
            const rawModels = await fetchCMTokenModels(config.discoveryUrl || DEFAULT_DISCOVERY_URL, 15000, effectiveToken);
            if (rawModels && rawModels.length > 0) {
@@ -84,7 +80,7 @@ async function resolveApiCatalog(ctx: ProviderCatalogContext) {
     const { fetchCMTokenModels, CMTokenSubscriptionError, CMTokenDiscoveryError } = await import("./discovery.js");
     const auth = ctx.resolveProviderAuth(PROVIDER_ID);
     const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
-    const oauthAccess = auth.access?.trim();
+    const oauthAccess = (auth as any).access?.trim();
     const effectiveToken = oauthAccess || token;
     
     if (!effectiveToken || effectiveToken.length < 16 || effectiveToken === "undefined" || effectiveToken === "null" || effectiveToken === "initial_activation_token") {
@@ -92,7 +88,7 @@ async function resolveApiCatalog(ctx: ProviderCatalogContext) {
        return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
     }
 
-    const oauthExpires = auth.expires as number | undefined;
+    const oauthExpires = (auth as any).expires as number | undefined;
     if (oauthExpires && Date.now() > oauthExpires) {
        trace("Skipping CMToken discovery: OAuth token expired, awaiting refresh.");
        return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
@@ -195,17 +191,15 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
       rawModels = await fetchCMTokenModels(discoveryUrl, 15000, result.access);
     } catch (err) {
       if (err instanceof CMTokenSubscriptionError) {
-        ctx.prompter.note({
-          title: "CMToken 订阅提醒",
-          body: `您的账号认证成功，但当前未包含可用订阅套餐。部分模型（如 minmax）可能无法使用，请检查您的套餐状态。\n\n错误详情: ${err.message}`,
-          severity: "warning"
-        });
+        ctx.prompter.note(
+          `您的账号认证成功，但当前未包含可用订阅套餐。部分模型（如 minmax）可能无法使用，请检查您的套餐状态。\n\n错误详情: ${err.message}`,
+          "CMToken 订阅提醒"
+        );
       } else if (err instanceof CMTokenDiscoveryError) {
-        ctx.prompter.note({
-          title: "CMToken 服务提醒",
-          body: `模型列表获取失败 (状态码: ${err.status})。这可能是由于网络波动或服务端暂时不可用引起的，我们将使用内置备用模型。\n\n详情: ${err.message}`,
-          severity: "info"
-        });
+        ctx.prompter.note(
+          `模型列表获取失败 (状态码: ${err.status})。这可能是由于网络波动或服务端暂时不可用引起的，我们将使用内置备用模型。\n\n详情: ${err.message}`,
+          "CMToken 服务提醒"
+        );
       } else {
         throw err;
       }
@@ -246,8 +240,8 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
         },
       } as any,
     });
-  } catch (err) {
-    if (err.name === "CMTokenSubscriptionError") {
+  } catch (err: any) {
+    if (err?.name === "CMTokenSubscriptionError") {
       progress.stop("CMToken OAuth 完成 (发现订阅问题)");
       // The result variable is not in scope here if loginCMTokenOAuth threw,
       // but here it threw in fetchCMTokenModels, so loginCMTokenOAuth already succeeded.
@@ -279,7 +273,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
           groupLabel: PROVIDER_LABEL,
           groupHint: "CMToken AI 模型",
         },
-        async run(ctx) {
+        async run(ctx: any) {
           const {
             ensureApiKeyFromOptionEnvOrPrompt,
             buildApiKeyCredential,
@@ -290,7 +284,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
           let capturedSecretInput: any;
           let capturedMode: any;
 
-          await ensureApiKeyFromOptionEnvOrPrompt({
+          await (ensureApiKeyFromOptionEnvOrPrompt as any)({
             config: ctx.config,
             env: {},
             provider: PROVIDER_ID,
@@ -299,7 +293,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
             normalize: normalizeApiKeyInput,
             validate: validateApiKeyInput,
             prompter: ctx.prompter,
-            setCredential: async (apiKey, mode) => {
+            setCredential: async (apiKey: string, mode: any) => {
               capturedSecretInput = apiKey;
               capturedMode = mode;
             },
@@ -367,9 +361,9 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
         },
       } as any,
     ],
-    catalog: { order: "simple", run: async (ctx) => resolveApiCatalog(ctx) },
-    augmentModelCatalog: (ctx) => augmentCMTokenCatalog(ctx),
-    async refreshOAuth(cred) {
+    catalog: { order: "simple", run: async (ctx: any) => resolveApiCatalog(ctx) },
+    augmentModelCatalog: (ctx: any) => augmentCMTokenCatalog(ctx),
+    async refreshOAuth(cred: any) {
       const { refreshCMTokenToken } = await import("./oauth.js");
       // Use defaults if config is not easily accessible here; 
       // but usually the plugin can access its own config if needed.
@@ -388,7 +382,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
         throw err;
       }
     },
-    classifyFailoverReason(ctx) {
+    classifyFailoverReason(ctx: any) {
       const errorMsg = ctx.error?.message || String(ctx.error);
       if (errorMsg.includes("订阅套餐") || errorMsg.includes("订阅已过期") || errorMsg.includes("余额不足")) {
         return "billing";

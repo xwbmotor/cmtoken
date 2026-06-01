@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import cmTokenManifest from "./openclaw.plugin.json";
+import cmTokenManifest from "./openclaw.plugin.json" with { type: "json" };
 
 describe("cmtoken manifest contract", () => {
   it("contains the correct unique id", () => {
