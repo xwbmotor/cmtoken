@@ -1,41 +1,41 @@
-# CMToken Plugin
+# CMToken 插件
 
-This is a model provider plugin for OpenClaw that supports CMToken authentication (OAuth via phone number) and model inference.
+这是一个 OpenClaw 的模型提供商插件，支持 CMToken 身份验证（通过手机号进行 OAuth）以及模型推理。
 
-## Features
+## 特性
 
-- **Decoupled**: Independent of the OpenClaw monorepo source code.
+- **解耦**：独立于 OpenClaw Monorepo 源代码。
 
-## Prerequisites
+## 前提条件
 
-- **Node.js**: Version 22 or higher.
-- **npm** or **pnpm**: For dependency management.
+- **Node.js**：版本 22 或更高。
+- **npm** 或 **pnpm**：用于依赖管理。
 
-## Installation
+## 安装步骤
 
-1.  **Extract**: Copy this folder to your desired location.
-2.  **Dependencies**:
+1. **解压**：将此文件夹复制到您期望的位置。
+2. **安装依赖**：
     ```bash
     pnpm install
     ```
 
-## Environment Configuration
+## 环境配置
 
-All API and OAuth endpoints are managed in `environments.json`. Since this file contains potentially sensitive URLs, it is ignored by Git.
+所有 API 和 OAuth 端点均在 `environments.json` 中进行管理。由于此文件包含潜在的敏感 URL，因此已被 Git 忽略。
 
-To get started, copy the example file:
+首先，复制示例文件：
 ```bash
 cp environments.json.example environments.json
 ```
-Then, modify `environments.json` to customize the built-in addresses:
+然后，修改 `environments.json` 以自定义内置地址：
 
 ```json
 {
   "test": {
-    "BASE_URL": "...",      // Inference API base
-    "DISCOVERY_URL": "...", // Model discovery endpoint
-    "OAUTH_URL": "...",     // OAuth server base
-    "CLIENT_ID": "..."      // OAuth client ID
+    "BASE_URL": "...",      // 推理 API 基地址
+    "DISCOVERY_URL": "...", // 模型发现端点
+    "OAUTH_URL": "...",     // OAuth 服务器基地址
+    "CLIENT_ID": "..."      // OAuth 客户端 ID
   },
   "prod": { ... }
 }
@@ -43,60 +43,60 @@ Then, modify `environments.json` to customize the built-in addresses:
 
 ---
 
-## Build & Package
+## 构建与打包
 
-### 🧪 Test Environment (Default)
-Used for local development and testing.
+### 🧪 测试环境（默认）
+用于本地开发和测试。
 
 ```bash
-# Build only
+# 仅构建
 pnpm run build
 
-# Build & Package (generates cmtoken.tgz)
+# 构建并打包（生成 cmtoken.tgz）
 pnpm run pack
 ```
 
-### 🚀 Production Environment
-Used for final distribution with official endpoints.
+### 🚀 生产环境
+用于使用官方端点的最终发布。
 
 ```bash
-# Build only
+# 仅构建
 node scripts/build.mjs --env=prod
 
-# Build & Package (generates cmtoken.tgz)
+# 构建并打包（生成 cmtoken.tgz）
 node scripts/build.mjs --env=prod --pack
 ```
 
 
-## Usage in OpenClaw
+## 在 OpenClaw 中使用
 
-Install the generated `.tgz` package directly:
+直接安装生成的 `.tgz` 包：
 
 ```bash
 openclaw plugins install ./cmtoken.tgz
 ```
 
-If you already have an older version installed, you can update it by running the same install command, or by uninstalling it first:
+如果您已经安装了旧版本，可以通过运行相同的安装命令进行更新，或者先卸载旧版本：
 
 ```bash
-# To uninstall first (optional)
+# 先卸载（可选）
 openclaw plugins uninstall cmtoken
 
-# Then install the new version
+# 然后安装新版本
 openclaw plugins install ./cmtoken.tgz
 ```
 
-Then, run the onboarding wizard or configuration command to set up CMToken:
+然后，运行新手引导向导或配置命令来设置 CMToken：
 
 ```bash
-# Recommended for first-time setup
+# 推荐首次设置时使用
 openclaw onboard
 
-# Or to modify existing configuration
+# 或者修改现有配置
 openclaw configure
 ```
 
-## Build Scripts
+## 构建脚本
 
-- `pnpm run build`: Bundles the plugin into `dist/index.js`.
-- `pnpm run pack`: Bundles and packages the plugin into `cmtoken.tgz`.
+- `pnpm run build`：将插件打包至 `dist/index.js`。
+- `pnpm run pack`：将插件打包并压缩为 `cmtoken.tgz`。
