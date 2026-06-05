@@ -33,6 +33,18 @@
       "cliDescription": "CMToken API key"
     }
   ],
+  "models": {
+    "catalog": [
+      {
+        "provider": "cmtoken",
+        "id": "deepseekv4-flash"
+      },
+      {
+        "provider": "cmtoken",
+        "id": "qwen36-35b"
+      }
+    ]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

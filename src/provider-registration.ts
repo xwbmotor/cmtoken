@@ -9,27 +9,68 @@ import {
   buildOauthProviderAuthResult,
 } from "openclaw/plugin-sdk/provider-auth";
 
-import { CMTOKEN_DEFAULT_MODEL_ID } from "./provider-models.js";
 
 const PROVIDER_ID = "cmtoken";
 const PROVIDER_LABEL = "CMToken";
 
-const DEFAULT_DISCOVERY_URL = "https://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/models";
-const DEFAULT_BASE_URL = "https://maas.gd.chinamobile.com:36007/ai/uifm/open/v1";
+declare const __CMTOKEN_DISCOVERY_URL__: string;
+declare const __CMTOKEN_BASE_URL__: string;
+
+const DEFAULT_DISCOVERY_URL = __CMTOKEN_DISCOVERY_URL__;
+const DEFAULT_BASE_URL = __CMTOKEN_BASE_URL__;
 
 const INLINED_STATIC_MODELS: any[] = [];
 
-// 保存 wizard 配置的引用，方便我们在请求到模型后动态注入 modelAllowlist，以绕过耗时的全局插件加载
+// Mutable wizard config objects. After run() fetches models, we inject allowedKeys
+// into modelAllowlist so OpenClaw's promptModelAllowlist takes the fast path
+// (skipping the slow global catalog load / "Loading available models" spinner).
+const CMTOKEN_WIZARD_SETUP: any = {
+  expectedProviders: [PROVIDER_ID],
+  modelAllowlist: {
+    loadCatalog: false,
+  },
+};
+
 const CMTOKEN_API_KEY_WIZARD_CONFIG: any = {
   choiceId: "cmtoken-api-key",
   choiceLabel: "CMToken API Key",
   groupId: PROVIDER_ID,
   groupLabel: PROVIDER_LABEL,
   groupHint: "CMToken AI 模型",
+  setup: CMTOKEN_WIZARD_SETUP,
+  // Also put modelAllowlist at root for older OpenClaw versions that read method.wizard.modelAllowlist
   modelAllowlist: {
-    loadCatalog: false
-  }
+    loadCatalog: false,
+  },
 };
+
+const CMTOKEN_OAUTH_WIZARD_CONFIG: any = {
+  choiceId: "cmtoken-oauth",
+  choiceLabel: "CMToken OAuth",
+  groupId: PROVIDER_ID,
+  groupLabel: PROVIDER_LABEL,
+  groupHint: "CMToken AI 模型",
+  setup: CMTOKEN_WIZARD_SETUP,
+  modelAllowlist: {
+    loadCatalog: false,
+  },
+};
+
+/** Inject dynamic model keys into all wizard config objects so OpenClaw skips catalog loading */
+function injectWizardAllowedKeys(keys: string[]) {
+  CMTOKEN_WIZARD_SETUP.modelAllowlist = {
+    loadCatalog: false,
+    allowedKeys: keys,
+  };
+  CMTOKEN_API_KEY_WIZARD_CONFIG.modelAllowlist = {
+    loadCatalog: false,
+    allowedKeys: keys,
+  };
+  CMTOKEN_OAUTH_WIZARD_CONFIG.modelAllowlist = {
+    loadCatalog: false,
+    allowedKeys: keys,
+  };
+}
 
 async function resolveApiCatalog(ctx: ProviderCatalogContext) {
   const config = ctx.config as any;
@@ -61,9 +102,23 @@ async function selectCMTokenDefaultModel(ctx: ProviderAuthContext, models: any[]
       currentDefault = `${cfgModel.provider || "unknown"}/${cfgModel.model}`;
     }
 
+    let isCurrentModelValid = true;
+    if (currentDefault !== "无") {
+      if (currentDefault.startsWith(`${PROVIDER_ID}/`)) {
+        const modelIdOnly = currentDefault.replace(`${PROVIDER_ID}/`, '');
+        isCurrentModelValid = models.some(m => m.id === modelIdOnly);
+      } else {
+        isCurrentModelValid = true;
+      }
+    }
+
     const options: any[] = [];
     if (currentDefault !== "无") {
-      options.push({ value: "skip", label: `保持原有默认模型 (Keep current default: ${currentDefault})` });
+      if (isCurrentModelValid) {
+        options.push({ value: "skip", label: `保持原有默认模型 (Keep current default: ${currentDefault})` });
+      } else {
+        options.push({ value: "skip", label: `保持原有默认模型 (⚠️已失效/无权限: ${currentDefault})` });
+      }
     }
     options.push(...models.map(m => ({ value: `${PROVIDER_ID}/${m.id}`, label: m.name || m.id })));
 
@@ -73,7 +128,7 @@ async function selectCMTokenDefaultModel(ctx: ProviderAuthContext, models: any[]
       initialValue: currentDefault !== "无" ? "skip" : options[0]?.value,
     });
     if (selected === "skip") {
-      return undefined;
+      return currentDefault !== "无" ? currentDefault : undefined;
     }
     if (typeof selected === "string") {
       return selected;
@@ -114,7 +169,7 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
       throw err;
     }
 
-    const models = rawModels.map((m: any) => ({
+    const finalModels = (rawModels || []).map((m: any) => ({
       id: m.id,
       name: m.name || m.id,
       reasoning: false,
@@ -124,10 +179,9 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
       maxTokens: m.maxTokens || 8192,
     }));
 
-    let finalModels = models;
-
     if (finalModels && finalModels.length > 0) {
       dynamicModelAllowlist = finalModels.map((m: any) => m.id.includes('/') ? m.id : `${PROVIDER_ID}/${m.id}`);
+      injectWizardAllowedKeys(dynamicModelAllowlist);
     }
 
     const primaryModelId = await selectCMTokenDefaultModel(ctx, finalModels);
@@ -159,6 +213,7 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
           }
         } : {})
       } as any,
+      replaceDefaultModels: !!primaryModelId,
     };
   } catch (err: any) {
     const errorMsg = formatErrorMessage(err);
@@ -179,6 +234,9 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
     id: PROVIDER_ID,
     label: PROVIDER_LABEL,
     docsPath: "/plugins/cmtoken",
+    wizard: {
+      setup: CMTOKEN_WIZARD_SETUP,
+    },
     auth: [
       {
         id: "api-key",
@@ -223,12 +281,11 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
 
           const config = ctx.config as any;
           const discoveryUrl = config.discoveryUrl || DEFAULT_DISCOVERY_URL;
-          let models: any[] = [];
-          try {
-            const { fetchCMTokenModels } = await import("./discovery.js");
-            const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, capturedSecretInput);
-            if (rawModels && Array.isArray(rawModels) && rawModels.length > 0) {
-              models = rawModels.map((m: any) => ({
+            let finalModels: any[] = [];
+            try {
+              const { fetchCMTokenModels } = await import("./discovery.js");
+              const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, capturedSecretInput);
+              finalModels = (rawModels || []).map((m: any) => ({
                 id: m.id,
                 name: m.name || m.id,
                 reasoning: false,
@@ -237,18 +294,19 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
                 contextWindow: m.contextWindow || 192000,
                 maxTokens: m.maxTokens || 8192,
               }));
-              if (models && models.length > 0) {
-                dynamicModelAllowlist = models.map((m: any) => `${PROVIDER_ID}/${m.id}`);
+              
+              if (finalModels && finalModels.length > 0) {
+                dynamicModelAllowlist = finalModels.map((m: any) => `${PROVIDER_ID}/${m.id}`);
+                injectWizardAllowedKeys(dynamicModelAllowlist);
               }
+            } catch (discoveryErr: any) {
+              if (discoveryErr instanceof Error) {
+                throw discoveryErr;
+              }
+              throw new Error(`模型列表获取失败。配置流程已中断。`);
             }
-          } catch (discoveryErr: any) {
-            if (discoveryErr instanceof Error) {
-              throw discoveryErr;
-            }
-            throw new Error(`模型列表获取失败。配置流程已中断。`);
-          }
 
-          const primaryModelId = await selectCMTokenDefaultModel(ctx, models);
+            const primaryModelId = await selectCMTokenDefaultModel(ctx, finalModels);
 
           // No longer caching dynamically here.
 
@@ -256,7 +314,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
             configPatch: {
               models: {
                 providers: {
-                  [PROVIDER_ID]: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models }
+                  [PROVIDER_ID]: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: finalModels }
                 }
               },
               ...(primaryModelId ? {
@@ -272,6 +330,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
             profiles: [
               { profileId, credential }
             ],
+            replaceDefaultModels: !!primaryModelId,
           };
         }
       } as any,
@@ -292,23 +351,9 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
           },
           // We no longer manually touch cfg.agents.defaults.models here to prevent overwrites.
         }),
-        wizard: {
-          choiceId: "cmtoken-oauth",
-          choiceLabel: "CMToken OAuth",
-          groupId: PROVIDER_ID,
-          groupLabel: PROVIDER_LABEL,
-          groupHint: "CMToken AI 模型",
-        },
+        wizard: CMTOKEN_OAUTH_WIZARD_CONFIG,
       } as any,
     ],
-    wizard: {
-      setup: {
-        modelAllowlist: { 
-          allowedKeys,
-          loadCatalog: false
-        }
-      }
-    },
     catalog: { order: "simple", run: async (ctx: any) => resolveApiCatalog(ctx) },
     augmentModelCatalog: (ctx: any) => augmentCMTokenCatalog(ctx),
     async refreshOAuth(cred: any) {

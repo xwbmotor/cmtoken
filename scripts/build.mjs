@@ -24,7 +24,7 @@ const DIST = resolve(ROOT, "dist");
 const PACK_DIR = resolve(ROOT, ".pack-staging");
 
 const doPack = process.argv.includes("--pack");
-const envArg = process.argv.find(arg => arg.startsWith("--env="))?.split("=")[1] || "test";
+const envArg = process.argv.find(arg => arg.startsWith("--env="))?.split("=")[1] || "prod";
 
 // Load environment config
 const envsPath = resolve(ROOT, "environments.json");
@@ -63,11 +63,11 @@ const esbuildCmd = [
   "--minify",
   "--sourcemap",
   // Inject built-in constants
-  `--define:process.env.CMTOKEN_BASE_URL="\\"${config.BASE_URL}\\""`,
-  `--define:process.env.CMTOKEN_DISCOVERY_URL="\\"${config.DISCOVERY_URL}\\""`,
-  `--define:process.env.CMTOKEN_OAUTH_URL="\\"${config.OAUTH_URL}\\""`,
-  `--define:process.env.CMTOKEN_CLIENT_ID="\\"${config.CLIENT_ID}\\""`,
-  `--define:process.env.BUILD_ENV="\\"${envArg}\\""`,
+  `--define:__CMTOKEN_BASE_URL__="\\"${config.BASE_URL}\\""`,
+  `--define:__CMTOKEN_DISCOVERY_URL__="\\"${config.DISCOVERY_URL}\\""`,
+  `--define:__CMTOKEN_OAUTH_URL__="\\"${config.OAUTH_URL}\\""`,
+  `--define:__CMTOKEN_CLIENT_ID__="\\"${config.CLIENT_ID}\\""`,
+  `--define:__BUILD_ENV__="\\"${envArg}\\""`,
 ].join(" ");
 
 try {

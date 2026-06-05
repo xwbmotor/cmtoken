@@ -14,9 +14,12 @@ function ensureOAuthDispatcher() {
 
 export type CMTokenRegion = "cn" | "global";
 
+declare const __CMTOKEN_OAUTH_URL__: string;
+declare const __CMTOKEN_CLIENT_ID__: string;
+
 const CMTOKEN_OAUTH_DEFAULT_CONFIG = {
-  baseUrl: process.env.CMTOKEN_OAUTH_URL as string,
-  clientId: process.env.CMTOKEN_CLIENT_ID as string,
+  baseUrl: __CMTOKEN_OAUTH_URL__,
+  clientId: __CMTOKEN_CLIENT_ID__,
 } as const;
 
 const hostname = os.hostname();
