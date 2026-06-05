@@ -27,15 +27,7 @@ const CMTOKEN_API_KEY_WIZARD_CONFIG: any = {
   groupLabel: PROVIDER_LABEL,
   groupHint: "CMToken AI 模型",
   modelAllowlist: {
-    allowedKeys: [
-      `${PROVIDER_ID}/minimax-m25`,
-      `${PROVIDER_ID}/qwen36-35b`,
-      `${PROVIDER_ID}/deepseekv4-flash`,
-      `${PROVIDER_ID}/deepseek-r1`,
-      `${PROVIDER_ID}/deepseek-v3`,
-      `${PROVIDER_ID}/qwen-max`,
-      `${PROVIDER_ID}/qwen-turbo`
-    ]
+    loadCatalog: false
   }
 };
 
