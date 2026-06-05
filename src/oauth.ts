@@ -339,7 +339,7 @@ export async function loginCMTokenOAuth(params: {
     }
 
     if (result.message?.includes("slow down")) {
-      pollIntervalMs = Math.min(pollIntervalMs * 1.5, 10000);
+      pollIntervalMs = Math.min(pollIntervalMs + 1000, 4000);
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
@@ -396,7 +396,7 @@ export async function refreshCMTokenToken(params: {
 }
 
 
-export async function fetchCMTokenModels(params: {
+export async function fetchCMTokenOAuthModels(params: {
   accessToken: string;
   baseUrl: string;
 }): Promise<Array<{ id: string; name: string; context_window?: number }>> {

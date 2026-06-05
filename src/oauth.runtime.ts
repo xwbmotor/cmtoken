@@ -1,1 +1,1 @@
-export { loginCMTokenOAuth, fetchCMTokenModels, refreshCMTokenToken } from "./oauth.js";
+export { loginCMTokenOAuth, fetchCMTokenOAuthModels, refreshCMTokenToken } from "./oauth.js";

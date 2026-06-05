@@ -104,7 +104,8 @@ const PKG_DIR = resolve(PACK_DIR, "package");
 mkdirSync(PKG_DIR, { recursive: true });
 
 // Copy artifacts into staging/package
-copyFileSync(resolve(DIST, "index.js"), resolve(PKG_DIR, "index.js"));
+mkdirSync(resolve(PKG_DIR, "dist"), { recursive: true });
+copyFileSync(resolve(DIST, "index.js"), resolve(PKG_DIR, "dist", "index.js"));
 
 // Sanitize package.json for bundling
 const bundlePkg = { ...pkg };

@@ -14,156 +14,81 @@ import { CMTOKEN_DEFAULT_MODEL_ID } from "./provider-models.js";
 const PROVIDER_ID = "cmtoken";
 const PROVIDER_LABEL = "CMToken";
 
-const DEFAULT_DISCOVERY_URL = process.env.CMTOKEN_DISCOVERY_URL as string;
-const DEFAULT_BASE_URL = process.env.CMTOKEN_BASE_URL as string;
+const DEFAULT_DISCOVERY_URL = "https://maas.gd.chinamobile.com:36007/ai/uifm/open/v1/models";
+const DEFAULT_BASE_URL = "https://maas.gd.chinamobile.com:36007/ai/uifm/open/v1";
 
-const INLINED_STATIC_MODELS = [
-  {
-    id: "minmax",
-    name: "minmax",
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 192000,
-    maxTokens: 8192,
+const INLINED_STATIC_MODELS: any[] = [];
+
+// 保存 wizard 配置的引用，方便我们在请求到模型后动态注入 modelAllowlist，以绕过耗时的全局插件加载
+const CMTOKEN_API_KEY_WIZARD_CONFIG: any = {
+  choiceId: "cmtoken-api-key",
+  choiceLabel: "CMToken API Key",
+  groupId: PROVIDER_ID,
+  groupLabel: PROVIDER_LABEL,
+  groupHint: "CMToken AI 模型",
+  modelAllowlist: {
+    allowedKeys: [
+      `${PROVIDER_ID}/minimax-m25`,
+      `${PROVIDER_ID}/qwen36-35b`,
+      `${PROVIDER_ID}/deepseekv4-flash`,
+      `${PROVIDER_ID}/deepseek-r1`,
+      `${PROVIDER_ID}/deepseek-v3`,
+      `${PROVIDER_ID}/qwen-max`,
+      `${PROVIDER_ID}/qwen-turbo`
+    ]
   }
-];
-
-let discoveryCache: any = null;
-
-const trace = (msg: string, start?: number) => {
-  return globalThis.performance ? performance.now() : Date.now();
 };
 
 async function resolveApiCatalog(ctx: ProviderCatalogContext) {
   const config = ctx.config as any;
-  const start = trace("Entering resolveApiCatalog");
-  if (discoveryCache && Date.now() - discoveryCache.timestamp < 300000) {
-    trace("Exiting resolveApiCatalog (Cache hit)", start);
-    return discoveryCache.data;
-  }
 
   // FAST PATH: Use models already saved in config (from OAuth/API Key setup) to avoid slow duplicate fetch on startup
-  if (config.models && Array.isArray(config.models) && config.models.length > 0) {
-    const result = { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: config.models } };
-    discoveryCache = { data: result, timestamp: Date.now() };
-    trace("Exiting resolveApiCatalog (Fast path via config.models)", start);
-    
-    // 异步在后台静默更新，不阻塞当前流程
-    // 这样既能保证启动瞬间秒开，又能保证长时间运行后模型列表是最新的
-    setTimeout(async () => {
-       try {
-         const { fetchCMTokenModels } = await import("./discovery.js");
-         const auth = ctx.resolveProviderAuth(PROVIDER_ID);
-         const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
-         const effectiveToken = (auth as any).access?.trim() || token;
-         if (effectiveToken && effectiveToken.length > 15) {
-           const rawModels = await fetchCMTokenModels(config.discoveryUrl || DEFAULT_DISCOVERY_URL, 15000, effectiveToken);
-           if (rawModels && rawModels.length > 0) {
-              const freshModels = rawModels.map((m: any) => ({
-                id: m.id, name: m.name || m.id, reasoning: false, input: ["text" as const],
-                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                contextWindow: m.contextWindow || 192000, maxTokens: m.maxTokens || 8192,
-              }));
-              discoveryCache = { data: { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: freshModels } }, timestamp: Date.now() };
-           }
-         }
-       } catch (e) { /* ignore background fetch errors */ }
-    }, 1000);
-
-    return result;
+  const providerModels = config.models?.providers?.[PROVIDER_ID]?.models;
+  if (providerModels && Array.isArray(providerModels) && providerModels.length > 0) {
+    return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: providerModels } };
   }
 
-  const discoveryUrl = config.discoveryUrl || DEFAULT_DISCOVERY_URL;
-  let finalModels: any[] = [];
-  try {
-    const { fetchCMTokenModels, CMTokenSubscriptionError, CMTokenDiscoveryError } = await import("./discovery.js");
-    const auth = ctx.resolveProviderAuth(PROVIDER_ID);
-    const token = auth.apiKey?.trim() || auth.discoveryApiKey?.trim() || ((ctx.config as any)?.apiKey)?.trim();
-    const oauthAccess = (auth as any).access?.trim();
-    const effectiveToken = oauthAccess || token;
-    
-    if (!effectiveToken || effectiveToken.length < 16 || effectiveToken === "undefined" || effectiveToken === "null" || effectiveToken === "initial_activation_token") {
-       trace("Skipping CMToken discovery: No valid token available yet.");
-       return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
-    }
-
-    const oauthExpires = (auth as any).expires as number | undefined;
-    if (oauthExpires && Date.now() > oauthExpires) {
-       trace("Skipping CMToken discovery: OAuth token expired, awaiting refresh.");
-       return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS } };
-    }
-
-    const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, effectiveToken);
-    if (rawModels && rawModels.length > 0) {
-      finalModels = rawModels.map((m: any) => ({
-        id: m.id,
-        name: m.name || m.id,
-        reasoning: false,
-        input: ["text" as const],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: m.contextWindow || 192000,
-        maxTokens: m.maxTokens || 8192,
-      }));
-    }
-  } catch (err: any) {
-    const { CMTokenSubscriptionError, CMTokenDiscoveryError } = await import("./discovery.js");
-    if (err instanceof CMTokenSubscriptionError) {
-      trace(`Subscription missing for CMToken: ${err.message}`);
-      finalModels = [{
-        id: "subscription-required",
-        name: "⚠️ 订阅到期 (请检查套餐)",
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 0,
-        maxTokens: 0,
-      }, ...INLINED_STATIC_MODELS];
-    } else if (err instanceof CMTokenDiscoveryError) {
-      trace(`Discovery API error (${err.status}): ${err.message}`);
-      finalModels = [{
-        id: "api-error",
-        name: `⚠️ 服务异常 (${err.status})`,
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 0,
-        maxTokens: 0,
-      }, ...INLINED_STATIC_MODELS];
-    } else {
-      trace(`Discovery error: ${err}`);
-    }
-  }
-
-  const isFallback = finalModels.length === 0;
-  if (isFallback) finalModels = INLINED_STATIC_MODELS.map(m => ({ ...m }));
-
-  const baseUrl = config.baseUrl || DEFAULT_BASE_URL;
-  const result = { provider: { baseUrl, api: "openai-completions" as const, models: finalModels } };
-
-  // If we fall back to static models, use a very short cache (10s) to encourage retries
-  const offset = isFallback ? 290000 : 0;
-  discoveryCache = { data: result, timestamp: Date.now() - offset };
-
-  trace(isFallback ? "Exiting resolveApiCatalog (Fallback used)" : "Exiting resolveApiCatalog (Success)", start);
-  return result;
+  // STATIC FALLBACK: Do not perform network requests during provider discovery to prevent blocking the OpenClaw CLI for up to 4 minutes on Windows.
+  // The real models will be fetched and saved during the 'configure' setup flow.
+  return { provider: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: INLINED_STATIC_MODELS.map(m => ({ ...m })) } };
 }
 
 function augmentCMTokenCatalog(ctx: any): any[] {
-  if (discoveryCache?.data?.provider?.models) {
-    return discoveryCache.data.provider.models.map((m: any) => ({ ...m, provider: PROVIDER_ID }));
-  }
   return INLINED_STATIC_MODELS.map(m => ({ ...m, provider: PROVIDER_ID }));
 }
 
-async function selectCMTokenDefaultModel(ctx: ProviderAuthContext, models: any[]): Promise<string> {
+async function selectCMTokenDefaultModel(ctx: ProviderAuthContext, models: any[]): Promise<string | undefined> {
   if (models.length > 0) {
-    // Always prioritize the first model from discovery to ensure 
-    // it works whether the ID is 'minmax', 'minmaxA', etc.
-    return models[0].id;
+    let currentDefault = "无";
+    const cfgModel = (ctx.config as any)?.agents?.defaults?.model;
+    if (typeof cfgModel === "string") {
+      currentDefault = cfgModel;
+    } else if (cfgModel && typeof cfgModel === "object" && cfgModel.primary) {
+      currentDefault = cfgModel.primary;
+    } else if (cfgModel && typeof cfgModel === "object" && cfgModel.model) {
+      currentDefault = `${cfgModel.provider || "unknown"}/${cfgModel.model}`;
+    }
+
+    const options: any[] = [];
+    if (currentDefault !== "无") {
+      options.push({ value: "skip", label: `保持原有默认模型 (Keep current default: ${currentDefault})` });
+    }
+    options.push(...models.map(m => ({ value: `${PROVIDER_ID}/${m.id}`, label: m.name || m.id })));
+
+    const selected = await ctx.prompter.select({
+      message: "请选择默认使用哪个模型？(Select Default Model)",
+      options,
+      initialValue: currentDefault !== "无" ? "skip" : options[0]?.value,
+    });
+    if (selected === "skip") {
+      return undefined;
+    }
+    if (typeof selected === "string") {
+      return selected;
+    }
   }
 
-  return CMTOKEN_DEFAULT_MODEL_ID;
+  return undefined;
 }
 
 async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthResult> {
@@ -183,7 +108,6 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
     });
     progress.stop("CMToken OAuth 完成");
 
-    // Model Discovery & Selection
     const discoveryUrl = config.discoveryUrl || DEFAULT_DISCOVERY_URL;
     const { fetchCMTokenModels, CMTokenSubscriptionError, CMTokenDiscoveryError } = await import("./discovery.js");
     let rawModels: any[] = [];
@@ -191,18 +115,11 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
       rawModels = await fetchCMTokenModels(discoveryUrl, 15000, result.access);
     } catch (err) {
       if (err instanceof CMTokenSubscriptionError) {
-        ctx.prompter.note(
-          `您的账号认证成功，但当前未包含可用订阅套餐。部分模型（如 minmax）可能无法使用，请检查您的套餐状态。\n\n错误详情: ${err.message}`,
-          "CMToken 订阅提醒"
-        );
-      } else if (err instanceof CMTokenDiscoveryError) {
-        ctx.prompter.note(
-          `模型列表获取失败 (状态码: ${err.status})。这可能是由于网络波动或服务端暂时不可用引起的，我们将使用内置备用模型。\n\n详情: ${err.message}`,
-          "CMToken 服务提醒"
-        );
-      } else {
         throw err;
+      } else if (err instanceof CMTokenDiscoveryError) {
+        throw new Error(`模型列表获取失败 (状态码: ${err.status})。这可能是由于网络波动或服务端暂时不可用引起的，配置流程已中断。\n\n详情: ${err.message}`);
       }
+      throw err;
     }
 
     const models = rawModels.map((m: any) => ({
@@ -215,47 +132,57 @@ async function runCMTokenOAuth(ctx: ProviderAuthContext): Promise<ProviderAuthRe
       maxTokens: m.maxTokens || 8192,
     }));
 
-    const primaryModelId = await selectCMTokenDefaultModel(ctx, models);
+    let finalModels = models;
 
-    // Update discoveryCache immediately
-    discoveryCache = {
-      timestamp: Date.now(),
-      data: {
-        provider: {
-          baseUrl: result.resourceUrl || config.baseUrl || DEFAULT_BASE_URL,
-          api: "openai-completions" as const,
-          models: models.length > 0 ? models : INLINED_STATIC_MODELS
-        }
-      }
-    };
+    if (finalModels && finalModels.length > 0) {
+      dynamicModelAllowlist = finalModels.map((m: any) => m.id.includes('/') ? m.id : `${PROVIDER_ID}/${m.id}`);
+    }
 
-    return buildOauthProviderAuthResult({
-      providerId: PROVIDER_ID, defaultModel: `${PROVIDER_ID}/${primaryModelId}`,
-      access: result.access, refresh: result.refresh, expires: result.expires,
+    const primaryModelId = await selectCMTokenDefaultModel(ctx, finalModels);
+
+    return {
+      profiles: [{
+        profileId: `${PROVIDER_ID}:default`,
+        credential: {
+          provider: PROVIDER_ID,
+          type: "oauth",
+          access: result.access,
+          refresh: result.refresh,
+          expires: result.expires,
+        } as any,
+      }],
       configPatch: {
         models: {
           providers: {
-            [PROVIDER_ID]: { baseUrl: result.resourceUrl || config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models }
+            [PROVIDER_ID]: { baseUrl: result.resourceUrl || config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models: finalModels }
           }
         },
+        ...(primaryModelId ? {
+          agents: {
+            defaults: {
+              model: {
+                primary: primaryModelId
+              }
+            }
+          }
+        } : {})
       } as any,
-    });
+    };
   } catch (err: any) {
-    if (err?.name === "CMTokenSubscriptionError") {
-      progress.stop("CMToken OAuth 完成 (发现订阅问题)");
-      // The result variable is not in scope here if loginCMTokenOAuth threw,
-      // but here it threw in fetchCMTokenModels, so loginCMTokenOAuth already succeeded.
-      // However, to keep it simple, if it's a subscription error, we already showed the note.
-      // We can just throw a modified error that core handles or just return success if we have the data.
-    }
     const errorMsg = formatErrorMessage(err);
     progress.stop(`CMToken OAuth 失败: ${errorMsg}`);
     throw err;
   }
 }
 
+// Module-level cache to store dynamically fetched models during the run() phase.
+// OpenClaw evaluates the plugin registry again after run() completes, so this
+// will inject the precise dynamic models into the wizard bypass.
+let dynamicModelAllowlist: string[] | undefined = undefined;
+
 export function registerCMTokenProviders(api: OpenClawPluginApi) {
-  // 1. Register real CMToken
+  const allowedKeys = dynamicModelAllowlist;
+
   api.registerProvider({
     id: PROVIDER_ID,
     label: PROVIDER_LABEL,
@@ -266,13 +193,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
         label: "CMToken API Key",
         hint: "使用 API Key 进行认证",
         kind: "api_key",
-        wizard: {
-          choiceId: "cmtoken-api-key",
-          choiceLabel: "CMToken API Key",
-          groupId: PROVIDER_ID,
-          groupLabel: PROVIDER_LABEL,
-          groupHint: "CMToken AI 模型",
-        },
+        wizard: CMTOKEN_API_KEY_WIZARD_CONFIG,
         async run(ctx: any) {
           const {
             ensureApiKeyFromOptionEnvOrPrompt,
@@ -285,10 +206,13 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
           let capturedMode: any;
 
           await (ensureApiKeyFromOptionEnvOrPrompt as any)({
+            token: ctx.opts?.token,
+            tokenProvider: ctx.opts?.tokenProvider,
+            secretInputMode: ctx.allowSecretRefPrompt === false ? (ctx.secretInputMode ?? "plaintext") : ctx.secretInputMode,
             config: ctx.config,
-            env: {},
+            env: ctx.env,
+            expectedProviders: [PROVIDER_ID],
             provider: PROVIDER_ID,
-            envLabel: "CMTOKEN_API_KEY",
             promptMessage: "请输入 CMToken API Key",
             normalize: normalizeApiKeyInput,
             validate: validateApiKeyInput,
@@ -305,33 +229,57 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
             config: ctx.config
           });
 
-          // Model Discovery & Selection
           const config = ctx.config as any;
           const discoveryUrl = config.discoveryUrl || DEFAULT_DISCOVERY_URL;
-          const { fetchCMTokenModels } = await import("./discovery.js");
-          const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, capturedSecretInput);
-          const models = rawModels.map((m: any) => ({
-            id: m.id,
-            name: m.name || m.id,
-            reasoning: false,
-            input: ["text" as const],
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: m.contextWindow || 192000,
-            maxTokens: m.maxTokens || 8192,
-          }));
+          let models: any[] = [];
+          try {
+            const { fetchCMTokenModels } = await import("./discovery.js");
+            const rawModels = await fetchCMTokenModels(discoveryUrl, 15000, capturedSecretInput);
+            if (rawModels && Array.isArray(rawModels) && rawModels.length > 0) {
+              models = rawModels.map((m: any) => ({
+                id: m.id,
+                name: m.name || m.id,
+                reasoning: false,
+                input: ["text" as const],
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: m.contextWindow || 192000,
+                maxTokens: m.maxTokens || 8192,
+              }));
+              if (models && models.length > 0) {
+                dynamicModelAllowlist = models.map((m: any) => `${PROVIDER_ID}/${m.id}`);
+              }
+            }
+          } catch (discoveryErr: any) {
+            if (discoveryErr instanceof Error) {
+              throw discoveryErr;
+            }
+            throw new Error(`模型列表获取失败。配置流程已中断。`);
+          }
 
           const primaryModelId = await selectCMTokenDefaultModel(ctx, models);
 
+          // No longer caching dynamically here.
+
           return {
-            profiles: [{ profileId, credential }],
-            defaultModel: `${PROVIDER_ID}/${primaryModelId}`,
             configPatch: {
               models: {
                 providers: {
                   [PROVIDER_ID]: { baseUrl: config.baseUrl || DEFAULT_BASE_URL, api: "openai-completions" as const, models }
                 }
               },
+              ...(primaryModelId ? {
+                agents: {
+                  defaults: {
+                    model: {
+                      primary: primaryModelId
+                    }
+                  }
+                }
+              } : {})
             } as any,
+            profiles: [
+              { profileId, credential }
+            ],
           };
         }
       } as any,
@@ -361,6 +309,14 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
         },
       } as any,
     ],
+    wizard: {
+      setup: {
+        modelAllowlist: { 
+          allowedKeys,
+          loadCatalog: false
+        }
+      }
+    },
     catalog: { order: "simple", run: async (ctx: any) => resolveApiCatalog(ctx) },
     augmentModelCatalog: (ctx: any) => augmentCMTokenCatalog(ctx),
     async refreshOAuth(cred: any) {
@@ -369,8 +325,7 @@ export function registerCMTokenProviders(api: OpenClawPluginApi) {
       // but usually the plugin can access its own config if needed.
       try {
         const result = await refreshCMTokenToken({ refreshToken: cred.refresh });
-        // Invalidate discovery cache so the next catalog call picks up potentially new subscription status
-        discoveryCache = null;
+        // Invalidate discovery cache logic removed
         return {
           ...cred,
           access: result.access,

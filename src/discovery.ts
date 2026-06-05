@@ -83,7 +83,7 @@ export async function fetchCMTokenModels(
       throw err;
     }
     if (!(err instanceof CMTokenDiscoveryError && (err.status === 401 || err.status === 400)) && !(err.message && (err.message.includes("100401") || err.message.includes("用户未登录")))) {
-      console.error(`[CMToken] Fetch models error: ${String(err.message || err).slice(0, 200)}`);
+      throw new CMTokenDiscoveryError(err.message || String(err), err.status || 0);
     }
     return STATIC_MODELS;
   }

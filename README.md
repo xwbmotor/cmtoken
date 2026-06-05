@@ -6,97 +6,52 @@
 
 - **解耦**：独立于 OpenClaw Monorepo 源代码。
 
-## 前提条件
 
-- **Node.js**：版本 22 或更高。
-- **npm** 或 **pnpm**：用于依赖管理。
 
-## 安装步骤
 
-1. **解压**：将此文件夹复制到您期望的位置。
-2. **安装依赖**：
-    ```bash
-    pnpm install
-    ```
 
-## 环境配置
 
-所有 API 和 OAuth 端点均在 `environments.json` 中进行管理。由于此文件包含潜在的敏感 URL，因此已被 Git 忽略。
+## 快速上手与安装
 
-首先，复制示例文件：
+此插件已发布至 NPM，您可以直接通过 OpenClaw 提供的命令行工具进行安装与升级。
+
+### 1. 安装插件
+
+在终端中执行以下命令直接从线上安装最新版：
+
 ```bash
-cp environments.json.example environments.json
+openclaw plugins install cmtoken
 ```
-然后，修改 `environments.json` 以自定义内置地址：
 
-```json
-{
-  "test": {
-    "BASE_URL": "...",      // 推理 API 基地址
-    "DISCOVERY_URL": "...", // 模型发现端点
-    "OAUTH_URL": "...",     // OAuth 服务器基地址
-    "CLIENT_ID": "..."      // OAuth 客户端 ID
-  },
-  "prod": { ... }
-}
+### 2. 配置与使用
+
+安装完成后，运行 OpenClaw 的配置向导：
+
+```bash
+openclaw configure
 ```
+在向导的 Provider 列表中选择 `CMToken`，您可以选择：
+- **OAuth 授权**：通过浏览器扫码快捷登录
+- **API Key 授权**：手动输入您的 CMToken Key
+
+配置完成后即可在对话中使用 CMToken 支持的模型！
 
 ---
 
-## 构建与打包
+## 强制升级与重置
 
-### 🧪 测试环境（默认）
-用于本地开发和测试。
-
-```bash
-# 仅构建
-pnpm run build
-
-# 构建并打包（生成 cmtoken.tgz）
-pnpm run pack
-```
-
-### 🚀 生产环境
-用于使用官方端点的最终发布。
+如果插件发布了新版本（例如修复了网络波动导致的问题），或者您发现当前插件状态异常，可以使用 `--force` 参数**强制重新拉取并覆盖安装最新版**：
 
 ```bash
-# 仅构建
-node scripts/build.mjs --env=prod
-
-# 构建并打包（生成 cmtoken.tgz）
-node scripts/build.mjs --env=prod --pack
+openclaw plugins install cmtoken --force
 ```
 
-
-## 在 OpenClaw 中使用
-
-直接安装生成的 `.tgz` 包：
-
+**⚠️ 注意：**
+升级完成后，建议您重新运行一次 `openclaw configure` 以确保最新配置生效。如果遇到依然加载旧版界面的玄学缓存问题，请尝试杀掉后台的 Node.js 进程重启 OpenClaw 守护进程：
 ```bash
-openclaw plugins install ./cmtoken.tgz
+# Windows
+taskkill /f /im node.exe
+# MacOS/Linux
+killall node
 ```
 
-如果您已经安装了旧版本，可以通过运行相同的安装命令进行更新，或者先卸载旧版本：
-
-```bash
-# 先卸载（可选）
-openclaw plugins uninstall cmtoken
-
-# 然后安装新版本
-openclaw plugins install ./cmtoken.tgz
-```
-
-然后，运行新手引导向导或配置命令来设置 CMToken：
-
-```bash
-# 推荐首次设置时使用
-openclaw onboard
-
-# 或者修改现有配置
-openclaw configure
-```
-
-## 构建脚本
-
-- `pnpm run build`：将插件打包至 `dist/index.js`。
-- `pnpm run pack`：将插件打包并压缩为 `cmtoken.tgz`。
