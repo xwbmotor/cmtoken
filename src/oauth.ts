@@ -385,13 +385,13 @@ export async function refreshCMTokenToken(params: {
     throw new Error(`CMToken OAuth refresh failed: ${payload.error_description || payload.error}`);
   }
 
-  if (!payload.access_token || !payload.refresh_token || !payload.expires_in) {
+  if (!payload.access_token || !payload.expires_in) {
     throw new Error("CMToken OAuth refresh returned incomplete token payload.");
   }
 
   return {
     access: payload.access_token,
-    refresh: payload.refresh_token,
+    refresh: payload.refresh_token || params.refreshToken,
     expires: Date.now() + payload.expires_in * 1000,
     resourceUrl: payload.resource_url,
     notification_message: payload.notification_message,

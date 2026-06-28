@@ -49,6 +49,8 @@ console.log("🔨 Building bundle...\n");
 const localEsbuild = resolve(ROOT, "node_modules/.bin/esbuild");
 const esbuildBin = existsSync(localEsbuild) ? `"${localEsbuild}"` : "npx esbuild";
 
+rmSync(resolve(DIST, "index.js.map"), { force: true });
+
 const esbuildCmd = [
   esbuildBin,
   `"${resolve(ROOT, "src/index.ts")}"`,
@@ -61,7 +63,7 @@ const esbuildCmd = [
   "--external:openclaw/plugin-sdk/*",
   "--external:@openclaw/*",
   "--minify",
-  "--sourcemap",
+  ...(envArg === "prod" ? [] : ["--sourcemap"]),
   // Inject built-in constants
   `--define:__CMTOKEN_BASE_URL__="\\"${config.BASE_URL}\\""`,
   `--define:__CMTOKEN_DISCOVERY_URL__="\\"${config.DISCOVERY_URL}\\""`,
